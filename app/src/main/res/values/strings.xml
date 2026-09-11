@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Handheld Alert</string>
+    <string name="accessibility_service_description">Lee el texto en pantalla (mensajes y número de ruta) del navegador para mostrar la alerta grande.</string>
+</resources>
