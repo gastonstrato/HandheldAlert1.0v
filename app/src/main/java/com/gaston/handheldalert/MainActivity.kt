@@ -30,6 +30,9 @@ class MainActivity : AppCompatActivity() {
                     putExtra(ScreenWatchService.EXTRA_RESULT_DATA, result.data)
                 }
                 startForegroundService(intent)
+                // The service updates its running state asynchronously. Give it
+                // a moment to enter the foreground before refreshing the UI.
+                binding.root.postDelayed({ refreshStatus() }, 700)
                 Toast.makeText(this, "Captura iniciada", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Permiso de captura rechazado", Toast.LENGTH_SHORT).show()
