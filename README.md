@@ -158,3 +158,7 @@ detecta, subilo si detecta de más).
   `TYPE_APPLICATION_OVERLAY` y `MediaProjection` en foreground service.
 - El texto sólo se lee de apps cuyo paquete esté en la lista de navegadores
   monitoreados.
+
+
+## v1.0.1
+- La pantalla principal ahora permite desplazamiento vertical para que los botones de captura y prueba sean accesibles en Honeywell con pantalla pequeña.
