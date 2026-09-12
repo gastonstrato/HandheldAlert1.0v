@@ -169,3 +169,6 @@ detecta, subilo si detecta de más).
 - Muestra el error real de inicio de captura en `MainActivity`.
 - Informa el estado de captura mediante broadcast interno.
 - Libera correctamente el bitmap temporal cuando hay row padding.
+
+## v1.0.5
+- Corrige el orden de parámetros de `MediaProjection.createVirtualDisplay` para Android/Kotlin.

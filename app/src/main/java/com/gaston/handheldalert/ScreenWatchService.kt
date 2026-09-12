@@ -142,8 +142,8 @@ class ScreenWatchService : Service() {
         virtualDisplay = mediaProjection.createVirtualDisplay(
             "HandheldAlertCapture",
             screenWidth, screenHeight, screenDensity,
-            imageReader!!.surface,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            imageReader!!.surface,
             null,
             handler
         )
