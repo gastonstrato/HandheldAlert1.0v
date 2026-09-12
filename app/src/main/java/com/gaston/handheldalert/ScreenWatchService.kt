@@ -34,12 +34,26 @@ class ScreenWatchService : Service() {
         const val EXTRA_RESULT_DATA = "result_data"
         private const val CHANNEL_ID = "screen_watch_channel"
         private const val NOTIFICATION_ID = 1001
+        const val ACTION_STATUS = "com.gaston.handheldalert.STATUS"
+        const val EXTRA_RUNNING = "running"
+        const val EXTRA_ERROR = "error"
         private const val CAPTURE_INTERVAL_MS = 700L
         private var isRunning = false
         fun isRunning() = isRunning
     }
 
     private lateinit var mediaProjection: MediaProjection
+    private val mediaProjectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            isRunning = false
+            broadcastStatus(false, null)
+            virtualDisplay?.release()
+            virtualDisplay = null
+            imageReader?.close()
+            imageReader = null
+            stopSelf()
+        }
+    }
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private lateinit var overlayManager: OverlayAlertManager
@@ -83,6 +97,8 @@ class ScreenWatchService : Service() {
         }
 
         if (resultCode == -1 || resultData == null) {
+            isRunning = false
+            broadcastStatus(false, "No se recibió el permiso de captura de pantalla.")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -90,9 +106,22 @@ class ScreenWatchService : Service() {
         val projectionManager =
             getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
+        // Android 14+ requires a MediaProjection.Callback to be registered
+        // before createVirtualDisplay(); otherwise the projection can fail
+        // with IllegalStateException and the service immediately dies.
+        mediaProjection.registerCallback(mediaProjectionCallback, handler)
 
-        setupVirtualDisplay()
-        isRunning = true
+        try {
+            setupVirtualDisplay()
+            isRunning = true
+            broadcastStatus(true, null)
+        } catch (e: Exception) {
+            isRunning = false
+            val message = "${e.javaClass.simpleName}: ${e.message ?: "sin detalle"}"
+            broadcastStatus(false, message)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
@@ -109,11 +138,14 @@ class ScreenWatchService : Service() {
             screenWidth, screenHeight, PixelFormat.RGBA_8888, 2
         )
 
+        // Firma correcta: surface antes que flags.
         virtualDisplay = mediaProjection.createVirtualDisplay(
             "HandheldAlertCapture",
             screenWidth, screenHeight, screenDensity,
+            imageReader!!.surface,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader!!.surface, null, handler
+            null,
+            handler
         )
 
         handler.post(captureLoop)
@@ -198,13 +230,16 @@ class ScreenWatchService : Service() {
         val rowStride = plane.rowStride
         val rowPadding = rowStride - pixelStride * image.width
 
-        val bitmap = Bitmap.createBitmap(
+        val sourceBitmap = Bitmap.createBitmap(
             image.width + rowPadding / pixelStride,
             image.height,
             Bitmap.Config.ARGB_8888
         )
-        bitmap.copyPixelsFromBuffer(buffer)
-        return if (rowPadding == 0) bitmap else Bitmap.createBitmap(bitmap, 0, 0, image.width, image.height)
+        sourceBitmap.copyPixelsFromBuffer(buffer)
+        if (rowPadding == 0) return sourceBitmap
+        val cropped = Bitmap.createBitmap(sourceBitmap, 0, 0, image.width, image.height)
+        sourceBitmap.recycle()
+        return cropped
     }
 
     private fun buildNotification(): Notification {
@@ -226,12 +261,24 @@ class ScreenWatchService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        broadcastStatus(false, null)
         handler.removeCallbacksAndMessages(null)
         handlerThread.quitSafely()
         virtualDisplay?.release()
         imageReader?.close()
-        if (::mediaProjection.isInitialized) mediaProjection.stop()
+        if (::mediaProjection.isInitialized) {
+            mediaProjection.unregisterCallback(mediaProjectionCallback)
+            mediaProjection.stop()
+        }
         overlayManager.hide()
+    }
+
+    private fun broadcastStatus(running: Boolean, error: String?) {
+        val intent = Intent(ACTION_STATUS).setPackage(packageName).apply {
+            putExtra(EXTRA_RUNNING, running)
+            if (error != null) putExtra(EXTRA_ERROR, error)
+        }
+        sendBroadcast(intent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

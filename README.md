@@ -162,3 +162,10 @@ detecta, subilo si detecta de más).
 
 ## v1.0.1
 - La pantalla principal ahora permite desplazamiento vertical para que los botones de captura y prueba sean accesibles en Honeywell con pantalla pequeña.
+
+
+## v1.0.4 diagnóstico
+- Corrige el orden de parámetros de `MediaProjection#createVirtualDisplay`.
+- Muestra el error real de inicio de captura en `MainActivity`.
+- Informa el estado de captura mediante broadcast interno.
+- Libera correctamente el bitmap temporal cuando hay row padding.
