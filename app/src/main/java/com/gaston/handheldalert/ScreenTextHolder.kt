@@ -58,6 +58,18 @@ object ScreenTextHolder {
         lastFaltan = firstMatch(FALTAN_PATTERN, screenText)
     }
 
+    /**
+     * Clasificación por texto (sin captura de pantalla ni gifs): si el texto
+     * leído trae el patrón de ruta ("R:8", "R 12345", etc.) es éxito (verde);
+     * si hay texto pero no matchea ruta, se trata como error (rojo) por
+     * ahora. El warning (amarillo) se suma más adelante, cuando se defina
+     * qué lo distingue de un error en el texto.
+     */
+    fun classify(): AlertState {
+        if (lastFullScreenText.isBlank()) return AlertState.NONE
+        return if (lastRouteNumber != null) AlertState.SUCCESS else AlertState.ERROR
+    }
+
     private fun firstMatch(pattern: Pattern, text: String): String? {
         val matcher = pattern.matcher(text)
         return if (matcher.find()) matcher.group(1) else null

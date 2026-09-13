@@ -10,11 +10,18 @@ import android.view.accessibility.AccessibilityNodeInfo
  * cadena. De ahí ScreenTextHolder saca el número de ruta ("R 12345") para
  * usarlo en la alerta grande.
  *
- * No lee imágenes (los <img> del WebView normalmente no exponen su src acá,
- * solo alt/contentDescription si el HTML lo trae) — el color/ícono lo detecta
- * ScreenWatchService por captura de pantalla.
+ * La detección de qué alerta mostrar es por texto, no por color de gif: si
+ * aparece el patrón de ruta ("R:8" y similares) es éxito (verde), cualquier
+ * otro texto se trata como error (rojo) por ahora — el aviso (amarillo) se
+ * suma más adelante. Se pide 2 lecturas seguidas iguales antes de actuar,
+ * para no parpadear con eventos de accesibilidad intermedios (carga de
+ * página, autocompletado, etc.).
  */
 class RouteAccessibilityService : AccessibilityService() {
+
+    private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
+    private var lastState = AlertState.NONE
+    private var stableCount = 0
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
@@ -25,8 +32,30 @@ class RouteAccessibilityService : AccessibilityService() {
         collectText(root, builder)
         root.recycle()
 
-        if (builder.isNotEmpty()) {
-            ScreenTextHolder.update(builder.toString())
+        if (builder.isEmpty()) return
+        ScreenTextHolder.update(builder.toString())
+        handleState(ScreenTextHolder.classify())
+    }
+
+    private fun handleState(detected: AlertState) {
+        if (detected == lastState) {
+            stableCount++
+        } else {
+            lastState = detected
+            stableCount = 1
+        }
+        if (stableCount != 2) return
+
+        when (detected) {
+            AlertState.NONE -> overlayManager.hide()
+            AlertState.SUCCESS -> overlayManager.show(
+                AlertState.SUCCESS,
+                ScreenTextHolder.successMessage()
+            )
+            AlertState.ERROR, AlertState.WARNING -> overlayManager.show(
+                detected,
+                ScreenTextHolder.lastFullScreenText.take(80)
+            )
         }
     }
 
