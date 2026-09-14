@@ -11,8 +11,8 @@ android {
         applicationId = "com.gaston.handheldalert"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.1.3"
+        versionCode = 11
+        versionName = "1.1.4"
     }
 
     buildTypes {

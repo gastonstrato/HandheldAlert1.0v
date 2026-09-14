@@ -142,6 +142,17 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.4
+- La demora e inconsistencia en la Zebra TC25AJ venía de depender solo de
+  que el WebView (Dolphin) avise el cambio de pantalla por evento de
+  accesibilidad, algo poco confiable en apps web viejas. Se agrega un
+  sondeo activo del árbol de accesibilidad cada 200ms mientras el
+  navegador está al frente, además de seguir escuchando eventos — así la
+  demora queda acotada aunque el evento no llegue o llegue tarde.
+- Se baja `notificationTimeout` del servicio de accesibilidad de 150ms a
+  0 (menos coalescing de eventos por parte del sistema) y se suman más
+  tipos de evento (`typeViewTextChanged`, `typeWindowsChanged`).
+
 ## v1.1.3
 - `RouteAccessibilityService` ahora ignora nodos no visibles (ej. opciones
   ocultas de un `<select>` colapsado). Antes se sumaban al texto igual,

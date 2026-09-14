@@ -1,33 +1,67 @@
 package com.gaston.handheldalert
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * Lee el árbol de accesibilidad de la ventana del navegador (Dolphin o Chrome)
- * cada vez que cambia el contenido, y junta el texto visible en una sola
- * cadena. De ahí ScreenTextHolder saca el número de ruta ("R 12345") para
- * usarlo en la alerta grande.
+ * y junta el texto visible en una sola cadena. De ahí ScreenTextHolder saca
+ * el número de ruta ("R 12345") para usarlo en la alerta grande.
  *
  * La detección de qué alerta mostrar es por texto, no por color de gif: si
  * aparece el patrón de ruta ("R:8" y similares) es éxito (verde), cualquier
  * otro texto se trata como error (rojo) por ahora — el aviso (amarillo) se
- * suma más adelante. Al ser patrones específicos (no "cualquier texto"), no
- * hace falta debounce: se actúa apenas se lee el texto, sin esperar una
- * segunda lectura igual. OverlayAlertManager es quien decide si hay que
- * refrescar/destellar el overlay (por ejemplo cuando entra un paquete nuevo
- * de la misma ruta y el color no cambia, pero el contenido sí).
+ * suma más adelante.
+ *
+ * No alcanza con reaccionar solo a onAccessibilityEvent: un WebView viejo
+ * como Dolphin no siempre avisa a tiempo (o directamente no avisa) cuando la
+ * página cambia por JS, así que además se sondea el árbol activo cada
+ * [POLL_INTERVAL_MS] mientras el navegador esté al frente. Esto acota la
+ * demora a ese intervalo en vez de depender de que el evento llegue.
  */
 class RouteAccessibilityService : AccessibilityService() {
 
+    companion object {
+        private const val POLL_INTERVAL_MS = 200L
+    }
+
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
+    private val pollHandler = Handler(Looper.getMainLooper())
+
+    private val pollLoop = object : Runnable {
+        override fun run() {
+            readAndClassify()
+            pollHandler.postDelayed(this, POLL_INTERVAL_MS)
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        pollHandler.post(pollLoop)
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
         if (!isMonitoredPackage(pkg)) return
+        readAndClassify()
+    }
 
-        val root = rootInActiveWindow ?: return
+    private fun readAndClassify() {
+        val root = try {
+            rootInActiveWindow
+        } catch (_: Exception) {
+            null
+        } ?: return
+
+        val pkg = root.packageName?.toString()
+        if (pkg == null || !isMonitoredPackage(pkg)) {
+            root.recycle()
+            return
+        }
+
         val builder = StringBuilder()
         collectText(root, builder)
         root.recycle()
@@ -73,6 +107,11 @@ class RouteAccessibilityService : AccessibilityService() {
             collectText(child, out, depth + 1)
             child.recycle()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pollHandler.removeCallbacks(pollLoop)
     }
 
     override fun onInterrupt() {
