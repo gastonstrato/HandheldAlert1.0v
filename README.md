@@ -142,6 +142,12 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.1
+- Agrega ícono propio de launcher (`ic_launcher`/`ic_launcher_round`, adaptive
+  icon): antes usaba `@android:drawable/ic_menu_view`, un ícono de sistema
+  para menús que varios launchers (sobre todo en dispositivos corporativos)
+  no mostraban en la pantalla principal.
+
 ## v1.1.0
 - Se reemplaza la detección por color de gif (captura de pantalla +
   `MediaProjection`, calibración manual de zona) por detección puramente de

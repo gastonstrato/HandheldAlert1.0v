@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Círculo blanco con signo de exclamación rojo: ícono del launcher (108x108,
+     zona segura circular de 66dp centrada, como pide un adaptive icon). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28C68.36,28 80,39.64 80,54C80,68.36 68.36,80 54,80C39.64,80 28,68.36 28,54C28,39.64 39.64,28 54,28Z" />
+    <path
+        android:fillColor="#8C1F23"
+        android:pathData="M51,38h6v22h-6z" />
+    <path
+        android:fillColor="#8C1F23"
+        android:pathData="M54,65C56.21,65 58,66.79 58,69C58,71.21 56.21,73 54,73C51.79,73 50,71.21 50,69C50,66.79 51.79,65 54,65Z" />
+</vector>
