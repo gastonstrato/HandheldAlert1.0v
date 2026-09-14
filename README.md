@@ -142,6 +142,15 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.2
+- Se saca el debounce de 2 lecturas iguales antes de mostrar la alerta: ya no
+  hace falta, la clasificación es por patrones específicos, y esperar una
+  segunda lectura igual generaba demora (a veces la alerta no llegaba a
+  aparecer si SAP no repetía el mismo texto).
+- El overlay ahora se refresca y destella cada vez que cambia el contenido
+  real (ej. entra un paquete nuevo de la misma ruta y sigue en verde), para
+  que se note que hubo una lectura nueva aunque el color no cambie.
+
 ## v1.1.1
 - Agrega ícono propio de launcher (`ic_launcher`/`ic_launcher_round`, adaptive
   icon): antes usaba `@android:drawable/ic_menu_view`, un ícono de sistema

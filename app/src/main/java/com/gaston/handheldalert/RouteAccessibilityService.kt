@@ -13,15 +13,15 @@ import android.view.accessibility.AccessibilityNodeInfo
  * La detección de qué alerta mostrar es por texto, no por color de gif: si
  * aparece el patrón de ruta ("R:8" y similares) es éxito (verde), cualquier
  * otro texto se trata como error (rojo) por ahora — el aviso (amarillo) se
- * suma más adelante. Se pide 2 lecturas seguidas iguales antes de actuar,
- * para no parpadear con eventos de accesibilidad intermedios (carga de
- * página, autocompletado, etc.).
+ * suma más adelante. Al ser patrones específicos (no "cualquier texto"), no
+ * hace falta debounce: se actúa apenas se lee el texto, sin esperar una
+ * segunda lectura igual. OverlayAlertManager es quien decide si hay que
+ * refrescar/destellar el overlay (por ejemplo cuando entra un paquete nuevo
+ * de la misma ruta y el color no cambia, pero el contenido sí).
  */
 class RouteAccessibilityService : AccessibilityService() {
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
-    private var lastState = AlertState.NONE
-    private var stableCount = 0
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
@@ -34,19 +34,8 @@ class RouteAccessibilityService : AccessibilityService() {
 
         if (builder.isEmpty()) return
         ScreenTextHolder.update(builder.toString())
-        handleState(ScreenTextHolder.classify())
-    }
 
-    private fun handleState(detected: AlertState) {
-        if (detected == lastState) {
-            stableCount++
-        } else {
-            lastState = detected
-            stableCount = 1
-        }
-        if (stableCount != 2) return
-
-        when (detected) {
+        when (val detected = ScreenTextHolder.classify()) {
             AlertState.NONE -> overlayManager.hide()
             AlertState.SUCCESS -> overlayManager.show(
                 AlertState.SUCCESS,

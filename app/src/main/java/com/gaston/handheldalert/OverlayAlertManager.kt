@@ -40,6 +40,7 @@ class OverlayAlertManager(private val context: Context) {
     private var overlayView: View? = null
     var currentState: AlertState = AlertState.NONE
         private set
+    private var lastShownMessage: String? = null
 
     fun show(state: AlertState, message: String) {
         if (state == AlertState.NONE) {
@@ -53,7 +54,8 @@ class OverlayAlertManager(private val context: Context) {
             else -> ContextColor.GREEN
         }
 
-        if (overlayView == null) {
+        val isNewOverlay = overlayView == null
+        if (isNewOverlay) {
             overlayView = buildView()
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -85,7 +87,28 @@ class OverlayAlertManager(private val context: Context) {
         // Tocar la alerta la oculta manualmente (por si el estado tarda en limpiarse).
         root.setOnClickListener { hide() }
 
+        // Si es la misma alerta con el mismo contenido (evento de accesibilidad
+        // repetido sin info nueva), no hace falta destellar. Pero si cambió el
+        // mensaje (ej. otro paquete de la misma ruta, mismo color verde) o el
+        // color, sí: así el operador nota que pasó algo nuevo aunque el estado
+        // general no haya cambiado.
+        val changed = isNewOverlay || state != currentState || message != lastShownMessage
         currentState = state
+        lastShownMessage = message
+        if (changed) flash(root)
+    }
+
+    /** Destello breve para que se note un cambio aunque el color sea el mismo. */
+    private fun flash(view: View) {
+        view.animate().cancel()
+        view.alpha = 1f
+        view.animate()
+            .alpha(0.35f)
+            .setDuration(120)
+            .withEndAction {
+                view.animate().alpha(1f).setDuration(160).start()
+            }
+            .start()
     }
 
     fun hide() {
@@ -94,6 +117,7 @@ class OverlayAlertManager(private val context: Context) {
         }
         overlayView = null
         currentState = AlertState.NONE
+        lastShownMessage = null
     }
 
     /**
