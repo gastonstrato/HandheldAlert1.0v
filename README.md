@@ -142,6 +142,17 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.6
+- Se suman patrones de error nuevos: "No se encontraron datos de
+  Seguimientos" y "La Unidad de Manipulación "..." se encuentra
+  Desconsolidada" (el código entre comillas es variable, se matchea
+  cualquier contenido ahí).
+- Se suma un formato alternativo de éxito con comillas:
+  `R:"..",O:".." -total:".." -Leido:".." - Faltan:".."`.
+- Texto del overlay más grande: 64sp (antes 45sp) y la segunda línea del
+  éxito pasa a 0.27 del tamaño grande (antes 0.42, para que no quede
+  desproporcionada con el tamaño nuevo).
+
 ## v1.1.5
 - Se endurece la detección de éxito: antes alcanzaba con encontrar una "R"
   seguida de un dígito en cualquier parte del texto leído, lo que disparaba

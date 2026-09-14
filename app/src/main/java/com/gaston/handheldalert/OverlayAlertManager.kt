@@ -133,7 +133,7 @@ class OverlayAlertManager(private val context: Context) {
 
         val spannable = SpannableString(message)
         spannable.setSpan(
-            RelativeSizeSpan(0.42f),
+            RelativeSizeSpan(0.27f),
             newlineIndex + 1,
             message.length,
             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -143,7 +143,7 @@ class OverlayAlertManager(private val context: Context) {
 
     private fun buildView(): View {
         val text = TextView(context).apply {
-            textSize = 45f
+            textSize = 64f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(48, 48, 48, 48)
