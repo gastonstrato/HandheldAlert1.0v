@@ -26,10 +26,18 @@ class RouteAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val POLL_INTERVAL_MS = 200L
+
+        // Cuántas lecturas seguidas de "nada" hacen falta antes de ocultar
+        // la alerta. Mostrar sigue siendo instantáneo (1 sola lectura); esto
+        // solo evita que un bache de una lectura a mitad de un re-render de
+        // la página (falta un dato por una fracción de segundo) apague y
+        // vuelva a prender el overlay — el parpadeo reportado en la Zebra.
+        private const val HIDE_AFTER_CONSECUTIVE_NONE = 3
     }
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
     private val pollHandler = Handler(Looper.getMainLooper())
+    private var noneStreak = 0
 
     private val pollLoop = object : Runnable {
         override fun run() {
@@ -70,15 +78,20 @@ class RouteAccessibilityService : AccessibilityService() {
         ScreenTextHolder.update(builder.toString())
 
         when (val detected = ScreenTextHolder.classify()) {
-            AlertState.NONE -> overlayManager.hide()
-            AlertState.SUCCESS -> overlayManager.show(
-                AlertState.SUCCESS,
-                ScreenTextHolder.successMessage()
-            )
-            AlertState.ERROR, AlertState.WARNING -> overlayManager.show(
-                detected,
-                ScreenTextHolder.lastFullScreenText.take(80)
-            )
+            AlertState.NONE -> {
+                noneStreak++
+                if (noneStreak >= HIDE_AFTER_CONSECUTIVE_NONE) {
+                    overlayManager.hide()
+                }
+            }
+            AlertState.SUCCESS -> {
+                noneStreak = 0
+                overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
+            }
+            AlertState.ERROR, AlertState.WARNING -> {
+                noneStreak = 0
+                overlayManager.show(detected, ScreenTextHolder.lastFullScreenText.take(80))
+            }
         }
     }
 

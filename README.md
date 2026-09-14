@@ -142,6 +142,14 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.7
+- Corrige el parpadeo del overlay verde en la Zebra: al sacar todo
+  debounce, un solo sondeo que agarrara la página a mitad de un re-render
+  (falta un dato del bloque de éxito por una fracción de segundo) apagaba
+  la alerta y la siguiente lectura la volvía a prender. Ahora mostrar
+  sigue siendo instantáneo, pero ocultar pide 3 lecturas seguidas de
+  "nada" (~600ms) antes de actuar.
+
 ## v1.1.6
 - Se suman patrones de error nuevos: "No se encontraron datos de
   Seguimientos" y "La Unidad de Manipulación "..." se encuentra
