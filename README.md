@@ -142,6 +142,17 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.2.0
+- Rediseño para frenar el parpadeo de raíz: en vez de reaccionar en cada
+  lectura de accesibilidad, el overlay ahora solo cambia en dos casos:
+  aparece un error/aviso conocido (se oculta y no muestra nada, por ahora)
+  o el bloque de resultado (ruta+orden+total+leído+faltan) cambia a
+  valores distintos a los últimos mostrados (eso es "código nuevo": oculta,
+  espera 200ms, muestra el dato nuevo). Cualquier otra lectura no toca el
+  overlay para nada — ni la misma alerta repetida, ni texto sin patrones.
+- El rojo de error queda deshabilitado temporalmente (solo cierra la
+  ventana) mientras se prueba que el verde funcione sin parpadeo.
+
 ## v1.1.8
 - El fix anterior del parpadeo contaba "lecturas seguidas de nada", pero con
   varios tipos de evento de accesibilidad activos y notificationTimeout=0,

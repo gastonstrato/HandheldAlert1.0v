@@ -3,45 +3,38 @@ package com.gaston.handheldalert
 import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * Lee el árbol de accesibilidad de la ventana del navegador (Dolphin o Chrome)
  * y junta el texto visible en una sola cadena. De ahí ScreenTextHolder saca
- * el número de ruta ("R 12345") para usarlo en la alerta grande.
+ * el número de ruta y el resto del bloque de éxito.
  *
- * La detección de qué alerta mostrar es por texto, no por color de gif: si
- * aparece el patrón de ruta ("R:8" y similares) es éxito (verde), cualquier
- * otro texto se trata como error (rojo) por ahora — el aviso (amarillo) se
- * suma más adelante.
+ * Diseño simplificado para no parpadear sin motivo: el overlay solo cambia
+ * de estado en dos casos concretos, no en cada lectura de accesibilidad:
  *
- * No alcanza con reaccionar solo a onAccessibilityEvent: un WebView viejo
- * como Dolphin no siempre avisa a tiempo (o directamente no avisa) cuando la
- * página cambia por JS, así que además se sondea el árbol activo cada
- * [POLL_INTERVAL_MS] mientras el navegador esté al frente. Esto acota la
- * demora a ese intervalo en vez de depender de que el evento llegue.
+ * 1. Aparece un error/aviso conocido -> se oculta la ventana y no se
+ *    muestra nada (por ahora; el rojo se vuelve a sumar más adelante,
+ *    cuando esto esté probado).
+ * 2. El bloque de resultado (ruta+orden+total+leído+faltan) cambia a un
+ *    conjunto de valores distinto al último mostrado -> eso significa que
+ *    se escaneó un código nuevo: se oculta la ventana, se espera
+ *    [BLINK_DELAY_MS] y se vuelve a mostrar con los datos nuevos.
+ *
+ * Cualquier otra lectura (texto sin patrones, o exactamente el mismo
+ * resultado de siempre) no toca el overlay para nada.
  */
 class RouteAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val POLL_INTERVAL_MS = 200L
-
-        // Cuánto tiempo REAL seguido sin matchear nada hace falta antes de
-        // ocultar la alerta. Mostrar sigue siendo instantáneo (1 sola
-        // lectura). Se mide por reloj, no por cantidad de lecturas: con
-        // varios tipos de evento de accesibilidad activos y
-        // notificationTimeout=0, readAndClassify() se puede llamar muchas
-        // veces por segundo, así que contar "N lecturas seguidas" no
-        // garantiza ningún tiempo mínimo real (podían pasar 3 en 50ms) — eso
-        // era lo que seguía haciendo parpadear la alerta.
-        private const val HIDE_AFTER_NONE_MS = 800L
+        private const val BLINK_DELAY_MS = 200L
     }
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
     private val pollHandler = Handler(Looper.getMainLooper())
-    private var noneSinceMs: Long? = null
+    private var lastShownSignature: String? = null
 
     private val pollLoop = object : Runnable {
         override fun run() {
@@ -81,21 +74,34 @@ class RouteAccessibilityService : AccessibilityService() {
         if (builder.isEmpty()) return
         ScreenTextHolder.update(builder.toString())
 
-        when (val detected = ScreenTextHolder.classify()) {
-            AlertState.NONE -> {
-                val now = SystemClock.elapsedRealtime()
-                val since = noneSinceMs ?: now.also { noneSinceMs = now }
-                if (now - since >= HIDE_AFTER_NONE_MS) {
-                    overlayManager.hide()
-                }
+        when (ScreenTextHolder.classify()) {
+            AlertState.ERROR, AlertState.WARNING -> {
+                // Por ahora: ante un error/aviso, cerrar y no mostrar nada.
+                lastShownSignature = null
+                overlayManager.hide()
             }
             AlertState.SUCCESS -> {
-                noneSinceMs = null
-                overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
+                val signature = ScreenTextHolder.resultSignature()
+                if (signature == null) {
+                    // Matcheó por una palabra suelta (ej. "confirmado") sin
+                    // el bloque completo de datos: se muestra directo, sin
+                    // lógica de parpadeo por firma.
+                    overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
+                } else if (signature != lastShownSignature) {
+                    // Ruta/orden/total/leído/faltan distintos a lo último
+                    // mostrado: es un código nuevo. Apagar, esperar un
+                    // toque, prender con el dato nuevo.
+                    lastShownSignature = signature
+                    overlayManager.hide()
+                    pollHandler.postDelayed({
+                        overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
+                    }, BLINK_DELAY_MS)
+                }
+                // Si la firma es igual a la ya mostrada, no se toca nada.
             }
-            AlertState.ERROR, AlertState.WARNING -> {
-                noneSinceMs = null
-                overlayManager.show(detected, ScreenTextHolder.lastFullScreenText.take(80))
+            AlertState.NONE -> {
+                // No hacemos nada: el overlay queda como esté hasta que
+                // haya un código nuevo o un error real.
             }
         }
     }
@@ -129,7 +135,9 @@ class RouteAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        pollHandler.removeCallbacks(pollLoop)
+        // removeCallbacksAndMessages para cancelar también un posible
+        // postDelayed de "prender después del parpadeo" pendiente.
+        pollHandler.removeCallbacksAndMessages(null)
     }
 
     override fun onInterrupt() {

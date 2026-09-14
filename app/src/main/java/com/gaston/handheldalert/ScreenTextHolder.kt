@@ -90,6 +90,19 @@ object ScreenTextHolder {
         lastRouteNumber != null && lastOrderNumber != null &&
             lastTotal != null && lastLeido != null && lastFaltan != null
 
+    /**
+     * "Firma" del resultado actual (ruta+orden+total+leído+faltan juntos),
+     * o null si no está el detalle completo. Cambia exactamente cuando se
+     * lee un código nuevo (el bloque entero se reemplaza), así que sirve
+     * para que RouteAccessibilityService sepa cuándo de verdad hay un
+     * escaneo nuevo — a diferencia de cada lectura de accesibilidad, que
+     * puede repetirse muchas veces sin que haya pasado nada.
+     */
+    fun resultSignature(): String? {
+        if (!hasFullRouteDetail()) return null
+        return "$lastRouteNumber|$lastOrderNumber|$lastTotal|$lastLeido|$lastFaltan"
+    }
+
     private fun firstMatch(pattern: Pattern, text: String): String? {
         val matcher = pattern.matcher(text)
         return if (matcher.find()) matcher.group(1) else null
