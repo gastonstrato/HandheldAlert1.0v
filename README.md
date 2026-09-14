@@ -142,6 +142,16 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.5
+- Se endurece la detección de éxito: antes alcanzaba con encontrar una "R"
+  seguida de un dígito en cualquier parte del texto leído, lo que disparaba
+  verde falso al escribir la letra "R" con el teclado en pantalla (si
+  cerca, en cualquier otro nodo, había algún dígito suelto). Ahora exige el
+  bloque completo junto — ruta + orden + total + leído + faltan — que es el
+  formato real y siempre igual de la pantalla de éxito de SAP.
+- Error/aviso ya funcionaban así (solo las frases cargadas en
+  `DetectionConfig`, nada por defecto): sin cambios ahí.
+
 ## v1.1.4
 - La demora e inconsistencia en la Zebra TC25AJ venía de depender solo de
   que el WebView (Dolphin) avise el cambio de pantalla por evento de

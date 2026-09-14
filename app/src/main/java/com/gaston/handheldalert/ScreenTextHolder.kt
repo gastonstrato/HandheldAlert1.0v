@@ -63,10 +63,17 @@ object ScreenTextHolder {
     /**
      * Clasificación por texto (sin captura de pantalla ni gifs), estricta:
      * solo dispara alerta si el texto matchea alguno de los patrones
-     * configurados en DetectionConfig (o el patrón de ruta, para éxito).
-     * Cualquier otro texto (campos normales de la transacción, navegación,
-     * etc.) no dispara nada. Prioridad si matchea más de un grupo:
-     * error > warning > éxito.
+     * configurados en DetectionConfig, o si aparece el bloque completo de
+     * éxito (ruta + orden + total + leído + faltan, todos juntos — el
+     * formato real de la pantalla de SAP). Cualquier otro texto (campos
+     * normales de la transacción, el teclado en pantalla, navegación, etc.)
+     * no dispara nada. Prioridad si matchea más de un grupo: error > warning
+     * > éxito.
+     *
+     * Importante: NO alcanza con encontrar una "R" seguida de un dígito en
+     * cualquier lado del texto (eso disparaba falsos verdes con el teclado
+     * en pantalla, ej. al escribir la letra "R" en un campo). Se exige el
+     * detalle completo junto, porque así sale siempre en la pantalla real.
      */
     fun classify(): AlertState {
         if (lastFullScreenText.isBlank()) return AlertState.NONE
@@ -74,10 +81,14 @@ object ScreenTextHolder {
         return when {
             matchesAny(ERROR_PATTERNS, text) -> AlertState.ERROR
             matchesAny(WARNING_PATTERNS, text) -> AlertState.WARNING
-            lastRouteNumber != null || matchesAny(SUCCESS_PATTERNS, text) -> AlertState.SUCCESS
+            hasFullRouteDetail() || matchesAny(SUCCESS_PATTERNS, text) -> AlertState.SUCCESS
             else -> AlertState.NONE
         }
     }
+
+    private fun hasFullRouteDetail(): Boolean =
+        lastRouteNumber != null && lastOrderNumber != null &&
+            lastTotal != null && lastLeido != null && lastFaltan != null
 
     private fun firstMatch(pattern: Pattern, text: String): String? {
         val matcher = pattern.matcher(text)
