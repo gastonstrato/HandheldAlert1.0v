@@ -23,6 +23,10 @@ object ScreenTextHolder {
     private val LEIDO_PATTERN: Pattern = Pattern.compile("[Ll]e[ií]do\\.?:?\\s?(\\d+)")
     private val FALTAN_PATTERN: Pattern = Pattern.compile("[Ff]altan\\.?:?\\s?(\\d+)")
 
+    private val ERROR_PATTERNS = compileAll(DetectionConfig.ERROR_TEXT_PATTERNS)
+    private val WARNING_PATTERNS = compileAll(DetectionConfig.WARNING_TEXT_PATTERNS)
+    private val SUCCESS_PATTERNS = compileAll(DetectionConfig.SUCCESS_TEXT_PATTERNS)
+
     @Volatile
     var lastFullScreenText: String = ""
         private set
@@ -57,21 +61,34 @@ object ScreenTextHolder {
     }
 
     /**
-     * Clasificación por texto (sin captura de pantalla ni gifs): si el texto
-     * leído trae el patrón de ruta ("R:8", "R 12345", etc.) es éxito (verde);
-     * si hay texto pero no matchea ruta, se trata como error (rojo) por
-     * ahora. El warning (amarillo) se suma más adelante, cuando se defina
-     * qué lo distingue de un error en el texto.
+     * Clasificación por texto (sin captura de pantalla ni gifs), estricta:
+     * solo dispara alerta si el texto matchea alguno de los patrones
+     * configurados en DetectionConfig (o el patrón de ruta, para éxito).
+     * Cualquier otro texto (campos normales de la transacción, navegación,
+     * etc.) no dispara nada. Prioridad si matchea más de un grupo:
+     * error > warning > éxito.
      */
     fun classify(): AlertState {
         if (lastFullScreenText.isBlank()) return AlertState.NONE
-        return if (lastRouteNumber != null) AlertState.SUCCESS else AlertState.ERROR
+        val text = lastFullScreenText
+        return when {
+            matchesAny(ERROR_PATTERNS, text) -> AlertState.ERROR
+            matchesAny(WARNING_PATTERNS, text) -> AlertState.WARNING
+            lastRouteNumber != null || matchesAny(SUCCESS_PATTERNS, text) -> AlertState.SUCCESS
+            else -> AlertState.NONE
+        }
     }
 
     private fun firstMatch(pattern: Pattern, text: String): String? {
         val matcher = pattern.matcher(text)
         return if (matcher.find()) matcher.group(1) else null
     }
+
+    private fun matchesAny(patterns: List<Pattern>, text: String): Boolean =
+        patterns.any { it.matcher(text).find() }
+
+    private fun compileAll(patterns: List<String>): List<Pattern> =
+        patterns.map { Pattern.compile(it, Pattern.CASE_INSENSITIVE) }
 
     /**
      * Mensaje de dos líneas para el overlay de éxito:

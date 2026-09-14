@@ -3,6 +3,7 @@ package com.gaston.handheldalert
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Typeface
 import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
@@ -118,10 +119,15 @@ class OverlayAlertManager(private val context: Context) {
 
     private fun buildView(): View {
         val text = TextView(context).apply {
-            textSize = 48f
+            textSize = 45f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(48, 48, 48, 48)
+            // Condensada + negrita (peso 700), en línea con Barlow Semi
+            // Condensed. Para usar la tipografía real, agregar el .ttf como
+            // recurso en res/font/ y reemplazar por
+            // ResourcesCompat.getFont(context, R.font.<nombre>).
+            typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
         }
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
