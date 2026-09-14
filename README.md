@@ -142,6 +142,14 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.2.1
+- Corrige que se quedara mostrando el paquete anterior al escanear uno
+  nuevo: el mensaje se armaba recién dentro del callback de 200ms, y en
+  ese lapso el sondeo podía volver a pisar el estado global de
+  `ScreenTextHolder` con una lectura vieja/parcial del WebView. Ahora el
+  mensaje se captura en el momento exacto en que se detecta el cambio de
+  firma, antes de programar el parpadeo.
+
 ## v1.2.0
 - Rediseño para frenar el parpadeo de raíz: en vez de reaccionar en cada
   lectura de accesibilidad, el overlay ahora solo cambia en dos casos:

@@ -91,10 +91,19 @@ class RouteAccessibilityService : AccessibilityService() {
                     // Ruta/orden/total/leído/faltan distintos a lo último
                     // mostrado: es un código nuevo. Apagar, esperar un
                     // toque, prender con el dato nuevo.
+                    //
+                    // Importante: el mensaje se arma ACÁ, no adentro del
+                    // postDelayed. ScreenTextHolder es un estado global
+                    // compartido que el sondeo puede volver a pisar en esos
+                    // 200ms (ej. si el WebView devuelve una lectura vieja o
+                    // parcial mientras tanto); si leyéramos successMessage()
+                    // recién al mostrar, podía terminar mostrando el dato de
+                    // OTRO escaneo distinto al que disparó el cambio.
                     lastShownSignature = signature
+                    val message = ScreenTextHolder.successMessage()
                     overlayManager.hide()
                     pollHandler.postDelayed({
-                        overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
+                        overlayManager.show(AlertState.SUCCESS, message)
                     }, BLINK_DELAY_MS)
                 }
                 // Si la firma es igual a la ya mostrada, no se toca nada.
