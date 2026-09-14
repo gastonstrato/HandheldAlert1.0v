@@ -56,6 +56,10 @@ class RouteAccessibilityService : AccessibilityService() {
 
     private fun collectText(node: AccessibilityNodeInfo?, out: StringBuilder, depth: Int = 0) {
         if (node == null || depth > 40) return
+        // Ojo: no seguir con nodos no visibles (ej. opciones ocultas de un
+        // <select> colapsado) — si no, su texto se suma igual aunque no
+        // aparezca en pantalla, y puede matchear un patrón por error.
+        if (!node.isVisibleToUser) return
         val text = node.text
         if (!text.isNullOrBlank()) {
             out.append(text).append(' ')

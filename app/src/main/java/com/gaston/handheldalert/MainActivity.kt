@@ -8,6 +8,7 @@ import android.text.TextUtils
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.gaston.handheldalert.databinding.ActivityMainBinding
 
@@ -33,6 +34,22 @@ class MainActivity : AppCompatActivity() {
                 "R8\nO:7 -total:33 -Leido:30 - Faltan:3"
             )
         }
+        binding.btnDebugText.setOnClickListener { showLastReadText() }
+    }
+
+    /**
+     * Muestra el último texto leído del navegador y en qué color lo
+     * clasificó, para poder confirmar en el momento (sin logs ni cable) qué
+     * está leyendo la app cuando algo no cierra — ej. si dispara una alerta
+     * que no corresponde, ver acá qué palabra la disparó.
+     */
+    private fun showLastReadText() {
+        val text = ScreenTextHolder.lastFullScreenText.ifBlank { "(todavía no se leyó nada)" }
+        AlertDialog.Builder(this)
+            .setTitle("Último texto leído: ${ScreenTextHolder.classify()}")
+            .setMessage(text)
+            .setPositiveButton("Cerrar", null)
+            .show()
     }
 
     override fun onResume() {

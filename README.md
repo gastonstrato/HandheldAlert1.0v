@@ -142,6 +142,16 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.3
+- `RouteAccessibilityService` ahora ignora nodos no visibles (ej. opciones
+  ocultas de un `<select>` colapsado). Antes se sumaban al texto igual,
+  aunque no aparecieran en pantalla, y podían matchear un patrón de error
+  por error (visto en la pantalla "Lectura Ruteador", que no tiene ninguna
+  palabra clave visible).
+- Se agrega un botón "Ver último texto leído (debug)" en la pantalla
+  principal para poder confirmar en el momento qué texto está leyendo la
+  app y en qué color lo clasificó, sin necesitar logs ni cable.
+
 ## v1.1.2
 - Se saca el debounce de 2 lecturas iguales antes de mostrar la alerta: ya no
   hace falta, la clasificación es por patrones específicos, y esperar una
