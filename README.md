@@ -142,6 +142,14 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.1.8
+- El fix anterior del parpadeo contaba "lecturas seguidas de nada", pero con
+  varios tipos de evento de accesibilidad activos y notificationTimeout=0,
+  `readAndClassify()` se puede llamar muchas veces por segundo — así que 3
+  lecturas podían pasar en 50ms, no en 600ms, y el parpadeo seguía. Ahora se
+  mide por tiempo real transcurrido (800ms sin matchear nada, sin importar
+  cuántas lecturas hubo en el medio) antes de ocultar la alerta.
+
 ## v1.1.7
 - Corrige el parpadeo del overlay verde en la Zebra: al sacar todo
   debounce, un solo sondeo que agarrara la página a mitad de un re-render

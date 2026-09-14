@@ -3,6 +3,7 @@ package com.gaston.handheldalert
 import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -27,17 +28,20 @@ class RouteAccessibilityService : AccessibilityService() {
     companion object {
         private const val POLL_INTERVAL_MS = 200L
 
-        // Cuántas lecturas seguidas de "nada" hacen falta antes de ocultar
-        // la alerta. Mostrar sigue siendo instantáneo (1 sola lectura); esto
-        // solo evita que un bache de una lectura a mitad de un re-render de
-        // la página (falta un dato por una fracción de segundo) apague y
-        // vuelva a prender el overlay — el parpadeo reportado en la Zebra.
-        private const val HIDE_AFTER_CONSECUTIVE_NONE = 3
+        // Cuánto tiempo REAL seguido sin matchear nada hace falta antes de
+        // ocultar la alerta. Mostrar sigue siendo instantáneo (1 sola
+        // lectura). Se mide por reloj, no por cantidad de lecturas: con
+        // varios tipos de evento de accesibilidad activos y
+        // notificationTimeout=0, readAndClassify() se puede llamar muchas
+        // veces por segundo, así que contar "N lecturas seguidas" no
+        // garantiza ningún tiempo mínimo real (podían pasar 3 en 50ms) — eso
+        // era lo que seguía haciendo parpadear la alerta.
+        private const val HIDE_AFTER_NONE_MS = 800L
     }
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
     private val pollHandler = Handler(Looper.getMainLooper())
-    private var noneStreak = 0
+    private var noneSinceMs: Long? = null
 
     private val pollLoop = object : Runnable {
         override fun run() {
@@ -79,17 +83,18 @@ class RouteAccessibilityService : AccessibilityService() {
 
         when (val detected = ScreenTextHolder.classify()) {
             AlertState.NONE -> {
-                noneStreak++
-                if (noneStreak >= HIDE_AFTER_CONSECUTIVE_NONE) {
+                val now = SystemClock.elapsedRealtime()
+                val since = noneSinceMs ?: now.also { noneSinceMs = now }
+                if (now - since >= HIDE_AFTER_NONE_MS) {
                     overlayManager.hide()
                 }
             }
             AlertState.SUCCESS -> {
-                noneStreak = 0
+                noneSinceMs = null
                 overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
             }
             AlertState.ERROR, AlertState.WARNING -> {
-                noneStreak = 0
+                noneSinceMs = null
                 overlayManager.show(detected, ScreenTextHolder.lastFullScreenText.take(80))
             }
         }
