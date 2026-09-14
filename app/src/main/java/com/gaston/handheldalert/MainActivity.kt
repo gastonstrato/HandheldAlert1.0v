@@ -1,8 +1,6 @@
 package com.gaston.handheldalert
 
-import android.app.Activity
 import android.content.Intent
-import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -22,24 +20,6 @@ class MainActivity : AppCompatActivity() {
             refreshStatus()
         }
 
-    private val screenCaptureLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                val intent = Intent(this, ScreenWatchService::class.java).apply {
-                    putExtra(ScreenWatchService.EXTRA_RESULT_CODE, result.resultCode)
-                    putExtra(ScreenWatchService.EXTRA_RESULT_DATA, result.data)
-                }
-                startForegroundService(intent)
-                // The service updates its running state asynchronously. Give it
-                // a moment to enter the foreground before refreshing the UI.
-                binding.root.postDelayed({ refreshStatus() }, 700)
-                Toast.makeText(this, "Captura iniciada", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Permiso de captura rechazado", Toast.LENGTH_SHORT).show()
-            }
-            refreshStatus()
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -47,14 +27,6 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnOverlayPermission.setOnClickListener { requestOverlayPermission() }
         binding.btnAccessibilityPermission.setOnClickListener { openAccessibilitySettings() }
-        binding.btnCalibrate.setOnClickListener {
-            startActivity(Intent(this, CalibrationActivity::class.java))
-        }
-        binding.btnStartCapture.setOnClickListener { requestScreenCapture() }
-        binding.btnStopCapture.setOnClickListener {
-            stopService(Intent(this, ScreenWatchService::class.java))
-            refreshStatus()
-        }
         binding.btnTestOverlay.setOnClickListener {
             OverlayAlertManager(this).show(
                 AlertState.SUCCESS,
@@ -84,11 +56,6 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
-    private fun requestScreenCapture() {
-        val manager = getSystemService(MediaProjectionManager::class.java)
-        screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
-    }
-
     private fun isAccessibilityServiceEnabled(): Boolean {
         val expected = "$packageName/${RouteAccessibilityService::class.java.canonicalName}"
         val enabled = Settings.Secure.getString(
@@ -105,14 +72,10 @@ class MainActivity : AppCompatActivity() {
     private fun refreshStatus() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accessibilityOk = isAccessibilityServiceEnabled()
-        val calibrated = DetectionConfig.isCalibrated(this)
-        val capturing = ScreenWatchService.isRunning()
 
         val status = buildString {
             append(if (overlayOk) "✔" else "✘").append(" Superposición\n")
-            append(if (accessibilityOk) "✔" else "✘").append(" Accesibilidad\n")
-            append(if (calibrated) "✔" else "✘").append(" Zona calibrada\n")
-            append(if (capturing) "✔" else "✘").append(" Captura activa")
+            append(if (accessibilityOk) "✔" else "✘").append(" Accesibilidad")
         }
         findViewById<TextView>(R.id.statusText).text = status
     }

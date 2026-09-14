@@ -2,9 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
@@ -24,11 +21,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".CalibrationActivity"
-            android:exported="false"
-            android:theme="@style/Theme.HandheldAlert.Overlay" />
-
         <service
             android:name=".RouteAccessibilityService"
             android:exported="false"
@@ -40,11 +32,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
-
-        <service
-            android:name=".ScreenWatchService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
 
     </application>
 </manifest>

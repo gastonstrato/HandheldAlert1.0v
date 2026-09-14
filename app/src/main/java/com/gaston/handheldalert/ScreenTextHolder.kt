@@ -3,10 +3,8 @@ package com.gaston.handheldalert
 import java.util.regex.Pattern
 
 /**
- * Puente simple entre RouteAccessibilityService (que lee los nodos de texto
- * del navegador) y ScreenWatchService (que analiza el color del ícono).
- * Cuando ScreenWatchService detecta error/warning/enter, consulta acá cuál
- * es el último texto/mensaje visible para armar la alerta.
+ * Guarda el último texto leído del navegador por RouteAccessibilityService
+ * y lo clasifica (éxito/error) para armar la alerta.
  *
  * Para el estado de éxito (enter.gif / tilde verde), la pantalla de SAP
  * (visto en YV33_RT, y ahora también esperado en ZV29) muestra una línea de

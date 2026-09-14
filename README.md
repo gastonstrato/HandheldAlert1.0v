@@ -5,39 +5,28 @@ muestra una alerta grande en el **75% superior** de la pantalla (el 25% de
 abajo queda libre para seguir completando los campos de la transacción,
 ej. Tipo/Número/Nro. Doc/Id. Clie/Cierre/Ordenar no leídos en ZV29):
 
-- **Roja** (`#8C1F23`) cuando aparece `error.gif`.
-- **Oliva/mostaza** (`#B39B2E`) cuando aparece `warning.gif`.
-- **Verde** (`#215A1C`) cuando aparece `enter.gif`, mostrando el número de
-  ruta leído de la pantalla (ej: `R 12345`).
-
-Los tres colores están medidos directamente de los gifs reales de SAP
-ITSmobile (`/sap/public/bc/its/mimes/itsmobile/99/images/all/`), no
-inventados — ver `ContextColor` en `OverlayAlertManager.kt`.
+- **Verde** (`#215A1C`) cuando el texto leído de la pantalla trae el patrón
+  de ruta (ej. `R:8`, `R 12345`), mostrando ese número.
+- **Roja** (`#8C1F23`) para cualquier otro texto, por ahora — se irá
+  ajustando con patrones/palabras clave concretas de aviso y error.
 
 ## Cómo funciona (resumen técnico)
 
-No es posible interceptar de forma confiable las requests de red de otra app
-(Dolphin/Chrome) sin instalar un certificado o correr un stack TCP/IP propio
-vía VpnService — así que la detección se hace por otras dos vías, que en la
-práctica cubren lo mismo:
+La detección es puramente por texto, vía accesibilidad — no usa captura de
+pantalla ni reconocimiento de color de íconos:
 
-1. **Color del ícono** (`ScreenWatchService` + `IconColorAnalyzer`): captura
-   la pantalla con `MediaProjection` cada ~700ms, recorta la zona calibrada
-   (donde sale error.gif / warning.gif / enter.gif — siempre pegados al
-   margen izquierdo, en la primera fila debajo del título) y clasifica el
-   color dominante entre los tres estados.
-2. **Texto / mensaje** (`RouteAccessibilityService` + `ScreenTextHolder`):
-   lee el árbol de accesibilidad del navegador cada vez que cambia el
-   contenido. Para el estado de éxito busca el patrón `R <número>`; para
-   error/aviso usa el texto completo leído (ej. "El campo Almacén es de
-   ingreso obligatorio").
+`RouteAccessibilityService` lee el árbol de accesibilidad del navegador cada
+vez que cambia el contenido y junta todo el texto visible. `ScreenTextHolder`
+clasifica ese texto: si matchea el patrón de ruta (`R <número>`) es éxito
+(verde); cualquier otro texto se trata como error (rojo) por ahora. Se pide
+2 lecturas seguidas iguales antes de actuar, para no parpadear con eventos
+intermedios (carga de página, autocompletado, etc.).
 
-Cuando el color detectado se estabiliza (2 lecturas seguidas iguales, para
-evitar parpadeos), `OverlayAlertManager` muestra el overlay ocupando el 75%
-superior de la pantalla (`Gravity.TOP`, alto = `OVERLAY_HEIGHT_FRACTION *
-displayMetrics.heightPixels`), rojo/oliva/verde según el estado, con el
-mensaje. El 25% inferior de la pantalla real queda sin cubrir — los toques
-ahí van directo al navegador.
+`OverlayAlertManager` muestra el overlay ocupando el 75% superior de la
+pantalla (`Gravity.TOP`, alto = `OVERLAY_HEIGHT_FRACTION *
+displayMetrics.heightPixels`), rojo o verde según el estado, con el mensaje.
+El 25% inferior de la pantalla real queda sin cubrir — los toques ahí van
+directo al navegador.
 
 ## Compilar el APK sin instalar nada (PC corporativa sin permisos de admin)
 
@@ -117,18 +106,10 @@ versión de Android).
       "Permitir sobre otras apps".
    2. **Habilitar servicio de accesibilidad** — en Ajustes > Accesibilidad,
       buscá "Handheld Alert" y activalo.
-   3. **Calibrar zona del ícono** — con el navegador mostrando la pantalla de
-      SAP donde sale error.gif / warning.gif / enter.gif (siempre pegado al
-      margen izquierdo, primera fila debajo del título), volvé a esta app y
-      arrastrá un rectángulo sobre esa zona (en proporción a la pantalla
-      completa, no hace falta que sea pixel-perfecto, pero cuanto más
-      ajustado mejor).
-   4. **Iniciar captura de pantalla** — Android va a pedir confirmación de
-      "compartir/grabar pantalla"; aceptá. A partir de ahí el servicio queda
-      corriendo en primer plano (aparece una notificación fija) monitoreando
-      la pantalla.
 3. Probá con el botón **"Probar alerta"** en la app para ver cómo se ve el
-   overlay verde antes de usarlo en SAP.
+   overlay verde antes de usarlo en SAP. Con los dos permisos habilitados,
+   la detección ya queda corriendo sola en background — no hace falta
+   ningún paso de captura ni calibración.
 
 ## Paquetes de navegador monitoreados
 
@@ -140,25 +121,35 @@ Si el handheld usa otro navegador o un paquete distinto, agregalo en
 `DetectionConfig.DEFAULT_BROWSER_PACKAGES` (archivo
 `app/src/main/java/com/gaston/handheldalert/DetectionConfig.kt`).
 
-## Ajustar la detección de color
+## Ajustar la detección de texto
 
-Si en la práctica el rojo/verde no se detecta bien (por ejemplo si el ícono
-es muy chico o el fondo tiene otro color), los umbrales están en
-`IconColorAnalyzer.kt` (variable `threshold`, 0.04 por defecto — bajalo si no
-detecta, subilo si detecta de más).
+Hoy `ScreenTextHolder.classify()` es deliberadamente simple: verde solo si
+aparece el patrón de ruta, rojo para cualquier otro texto. Esto es un punto
+de partida — falta sumar patrones/palabras clave específicas para separar
+aviso (amarillo, todavía sin implementar) de error real, y evitar que
+cualquier texto normal de la pantalla (mientras se completan campos)
+dispare rojo de más.
 
 ## Limitaciones conocidas
 
-- La calibración es "a ciegas": esta versión no muestra una foto en vivo de
-  la pantalla real durante la calibración (Android no deja ver otra app
-  detrás sin capturarla primero). Conviene calibrar mirando la posición del
-  ícono a ojo (esquina, % aproximado del ancho/alto) y ajustar por prueba y
-  error con el botón de test.
+- Al leer todo el árbol de accesibilidad de la ventana activa, cualquier
+  cambio de texto en el navegador monitoreado (no solo los mensajes de SAP)
+  puede disparar una reclasificación. Se está ajustando con patrones más
+  específicos.
 - Funciona a partir de Android 8.0 (API 26) por el uso de
-  `TYPE_APPLICATION_OVERLAY` y `MediaProjection` en foreground service.
+  `TYPE_APPLICATION_OVERLAY`.
 - El texto sólo se lee de apps cuyo paquete esté en la lista de navegadores
   monitoreados.
 
+
+## v1.1.0
+- Se reemplaza la detección por color de gif (captura de pantalla +
+  `MediaProjection`, calibración manual de zona) por detección puramente de
+  texto vía accesibilidad: verde si el texto trae el patrón de ruta, rojo
+  para el resto por ahora.
+- Se eliminan `ScreenWatchService`, `IconColorAnalyzer`, `CalibrationActivity`
+  y `SelectionOverlayView` (ya sin uso), junto con los pasos de calibrar
+  zona e iniciar captura de la pantalla principal.
 
 ## v1.0.1
 - La pantalla principal ahora permite desplazamiento vertical para que los botones de captura y prueba sean accesibles en Honeywell con pantalla pequeña.

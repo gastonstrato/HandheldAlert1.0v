@@ -42,27 +42,6 @@
             android:text="2. Habilitar servicio de accesibilidad" />
 
         <Button
-            android:id="@+id/btnCalibrate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="3. Calibrar zona del ícono (error/tilde verde)" />
-
-        <Button
-            android:id="@+id/btnStartCapture"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="4. Iniciar captura de pantalla" />
-
-        <Button
-            android:id="@+id/btnStopCapture"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Detener captura" />
-
-        <Button
             android:id="@+id/btnTestOverlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
