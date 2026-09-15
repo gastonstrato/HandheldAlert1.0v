@@ -27,6 +27,16 @@ object ScreenTextHolder {
     private val WARNING_PATTERNS = compileAll(DetectionConfig.WARNING_TEXT_PATTERNS)
     private val SUCCESS_PATTERNS = compileAll(DetectionConfig.SUCCESS_TEXT_PATTERNS)
 
+    // Marcadores de la pantalla "Lectura Ruteador": esa tabla trae Nro.
+    // Seguimiento, Fecha Jornada, ID Jornada, Razón Social, Dirección, Ruta,
+    // Orden — sin Total/Leído/Faltan (es una transacción distinta a
+    // Apertura de HU), así que el bloque R/O/total/Leído/Faltan nunca va a
+    // aparecer ahí. Estos dos textos son específicos de esa tabla, no
+    // aparecen en otras pantallas (ej. Apertura de HU tiene "Doc. Retiro",
+    // "Bultos", "Tranfer", no "Nro. Seguimiento" ni "Razón Social").
+    private val NRO_SEGUIMIENTO_MARKER = Pattern.compile("Nro\\.?\\s*Seguimiento", Pattern.CASE_INSENSITIVE)
+    private val RAZON_SOCIAL_MARKER = Pattern.compile("Raz[oó]n\\s*Social", Pattern.CASE_INSENSITIVE)
+
     @Volatile
     var lastFullScreenText: String = ""
         private set
@@ -81,7 +91,8 @@ object ScreenTextHolder {
         return when {
             matchesAny(ERROR_PATTERNS, text) -> AlertState.ERROR
             matchesAny(WARNING_PATTERNS, text) -> AlertState.WARNING
-            hasFullRouteDetail() || matchesAny(SUCCESS_PATTERNS, text) -> AlertState.SUCCESS
+            hasFullRouteDetail() || matchesAny(SUCCESS_PATTERNS, text) ||
+                lecturaRuteadorRowSignature() != null -> AlertState.SUCCESS
             else -> AlertState.NONE
         }
     }
@@ -103,6 +114,30 @@ object ScreenTextHolder {
         return "$lastRouteNumber|$lastOrderNumber|$lastTotal|$lastLeido|$lastFaltan"
     }
 
+    /**
+     * Firma de fila para "Lectura Ruteador": esa pantalla no tiene el bloque
+     * R/O/total/Leído/Faltan, así que la firma de "hay un paquete nuevo" es
+     * directamente el bloque de datos completo de la fila (todo lo que
+     * aparece después del encabezado de la tabla) — la combinación de Nro.
+     * Seguimiento + Fecha Jornada + ID Jornada + Razón Social + Dirección +
+     * Ruta + Orden nunca se repite igual entre dos escaneos.
+     */
+    fun lecturaRuteadorRowSignature(): String? {
+        val text = lastFullScreenText
+        if (!NRO_SEGUIMIENTO_MARKER.matcher(text).find() || !RAZON_SOCIAL_MARKER.matcher(text).find()) {
+            return null
+        }
+        val headerEnd = text.lastIndexOf("Orden", ignoreCase = true)
+        if (headerEnd == -1) return null
+        var dataRegion = text.substring(headerEnd + "Orden".length)
+        val footerIndex = dataRegion.indexOf("pág.", ignoreCase = true)
+        if (footerIndex >= 0) dataRegion = dataRegion.substring(0, footerIndex)
+        return dataRegion.trim().ifBlank { null }
+    }
+
+    /** Firma unificada: la que esté disponible según la pantalla actual. */
+    fun currentSignature(): String? = resultSignature() ?: lecturaRuteadorRowSignature()
+
     private fun firstMatch(pattern: Pattern, text: String): String? {
         val matcher = pattern.matcher(text)
         return if (matcher.find()) matcher.group(1) else null
@@ -115,27 +150,29 @@ object ScreenTextHolder {
         patterns.map { Pattern.compile(it, Pattern.CASE_INSENSITIVE) }
 
     /**
-     * Mensaje de dos líneas para el overlay de éxito:
-     * línea 1 (grande) = "R<número>"
-     * línea 2 (chica)  = "O:<orden> -total:<total> -Leido:<leido> - Faltan:<faltan>"
-     * separadas por "\n" — OverlayAlertManager achica la segunda línea.
-     * Si no se encontró el detalle completo (O/total/Leido/Faltan), muestra
-     * solo la ruta o, en su defecto, el texto crudo leído de la pantalla.
+     * Mensaje para el overlay de éxito. Si está el bloque completo de
+     * Apertura de HU (ruta+orden+total+leído+faltan), arma dos líneas:
+     * grande "R<número>" y abajo, más chico,
+     * "O:<orden> -total:<total> -Leido:<leido> - Faltan:<faltan>"
+     * (OverlayAlertManager achica la segunda línea). Si en cambio lo que
+     * hay es la fila de Lectura Ruteador, muestra esa fila. En su defecto,
+     * el texto crudo leído de la pantalla.
      */
     fun successMessage(): String {
-        val route = lastRouteNumber
-        val order = lastOrderNumber
-        val total = lastTotal
-        val leido = lastLeido
-        val faltan = lastFaltan
-
-        if (route == null) return lastFullScreenText.take(80)
-
-        val big = "R$route"
-        if (order == null || total == null || leido == null || faltan == null) {
-            return big
+        if (hasFullRouteDetail()) {
+            val big = "R$lastRouteNumber"
+            val small = "O:$lastOrderNumber -total:$lastTotal -Leido:$lastLeido - Faltan:$lastFaltan"
+            return "$big\n$small"
         }
-        val small = "O:$order -total:$total -Leido:$leido - Faltan:$faltan"
-        return "$big\n$small"
+
+        // Ojo: se chequea ANTES que "solo ruta", porque en Lectura Ruteador
+        // el encabezado "Ruta" de la tabla puede matchear ROUTE_PATTERN por
+        // casualidad (ej. si hay un dígito suelto cerca) sin que en verdad
+        // estemos ante el bloque de Apertura de HU.
+        lecturaRuteadorRowSignature()?.let { return it.take(80) }
+
+        if (lastRouteNumber != null) return "R$lastRouteNumber"
+
+        return lastFullScreenText.take(80)
     }
 }

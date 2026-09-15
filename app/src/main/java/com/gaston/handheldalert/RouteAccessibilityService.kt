@@ -17,10 +17,12 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 1. Aparece un error/aviso conocido -> se oculta la ventana y no se
  *    muestra nada (por ahora; el rojo se vuelve a sumar más adelante,
  *    cuando esto esté probado).
- * 2. El bloque de resultado (ruta+orden+total+leído+faltan) cambia a un
- *    conjunto de valores distinto al último mostrado -> eso significa que
- *    se escaneó un código nuevo: se oculta la ventana, se espera
- *    [BLINK_DELAY_MS] y se vuelve a mostrar con los datos nuevos.
+ * 2. La "firma" del resultado actual (ScreenTextHolder.currentSignature():
+ *    ruta+orden+total+leído+faltan en Apertura de HU, o la fila completa de
+ *    la tabla en Lectura Ruteador) cambia respecto a la última mostrada ->
+ *    eso significa que se escaneó un código nuevo: se oculta la ventana, se
+ *    espera [BLINK_DELAY_MS] y se vuelve a mostrar con los datos nuevos
+ *    (con un fade-in, para que se note que es un dato nuevo).
  *
  * Cualquier otra lectura (texto sin patrones, o exactamente el mismo
  * resultado de siempre) no toca el overlay para nada.
@@ -81,7 +83,7 @@ class RouteAccessibilityService : AccessibilityService() {
                 overlayManager.hide()
             }
             AlertState.SUCCESS -> {
-                val signature = ScreenTextHolder.resultSignature()
+                val signature = ScreenTextHolder.currentSignature()
                 if (signature == null) {
                     // Matcheó por una palabra suelta (ej. "confirmado") sin
                     // el bloque completo de datos: se muestra directo, sin

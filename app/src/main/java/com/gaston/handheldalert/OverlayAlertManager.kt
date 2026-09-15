@@ -57,6 +57,7 @@ class OverlayAlertManager(private val context: Context) {
         val isNewOverlay = overlayView == null
         if (isNewOverlay) {
             overlayView = buildView()
+            overlayView?.alpha = 0f
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
@@ -88,27 +89,21 @@ class OverlayAlertManager(private val context: Context) {
         root.setOnClickListener { hide() }
 
         // Si es la misma alerta con el mismo contenido (evento de accesibilidad
-        // repetido sin info nueva), no hace falta destellar. Pero si cambió el
-        // mensaje (ej. otro paquete de la misma ruta, mismo color verde) o el
-        // color, sí: así el operador nota que pasó algo nuevo aunque el estado
-        // general no haya cambiado.
+        // repetido sin info nueva), no hace falta animar. Pero si cambió el
+        // mensaje (ej. otro paquete escaneado, mismo color verde) o el color,
+        // sí: un fade-in para que el operador note que hay un dato nuevo
+        // aunque el estado general (verde) no haya cambiado.
         val changed = isNewOverlay || state != currentState || message != lastShownMessage
         currentState = state
         lastShownMessage = message
-        if (changed) flash(root)
+        if (changed) fadeIn(root)
     }
 
-    /** Destello breve para que se note un cambio aunque el color sea el mismo. */
-    private fun flash(view: View) {
+    /** Fade-in rápido para distinguir que se trata de un dato nuevo. */
+    private fun fadeIn(view: View) {
         view.animate().cancel()
-        view.alpha = 1f
-        view.animate()
-            .alpha(0.35f)
-            .setDuration(120)
-            .withEndAction {
-                view.animate().alpha(1f).setDuration(160).start()
-            }
-            .start()
+        view.alpha = 0f
+        view.animate().alpha(1f).setDuration(220).start()
     }
 
     fun hide() {

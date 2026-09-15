@@ -142,6 +142,20 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.3.0
+- Se suma soporte para la pantalla "Lectura Ruteador" (transacción
+  distinta a Apertura de HU, sin bloque Total/Leído/Faltan): la firma de
+  "hay un paquete nuevo" ahí es la fila completa de la tabla (Nro.
+  Seguimiento + Fecha Jornada + ID Jornada + Razón Social + Dirección +
+  Ruta + Orden), que nunca se repite igual entre dos escaneos. Antes esta
+  pantalla no disparaba ninguna alerta.
+- `ScreenTextHolder.currentSignature()` unifica ambas firmas (la de
+  Apertura de HU y la de Lectura Ruteador) para que
+  RouteAccessibilityService no tenga que saber en qué pantalla está.
+- El destello (dim y vuelta) se reemplaza por un fade-in real (alpha 0→1)
+  cada vez que cambia el dato mostrado, más acorde a "reiniciar" la
+  ventana con la nueva pieza escaneada.
+
 ## v1.2.1
 - Corrige que se quedara mostrando el paquete anterior al escanear uno
   nuevo: el mensaje se armaba recién dentro del callback de 200ms, y en
