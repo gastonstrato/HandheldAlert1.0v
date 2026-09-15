@@ -23,6 +23,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # El paquete "tools" (legacy) ya no existe en el repositorio de
+          # Google — solo queda "cmdline-tools". El default de esta acción
+          # es "tools platform-tools", así que lo pisamos para que no
+          # intente instalar el que ya no está.
+          packages: "platform-tools"
 
       - name: Install SDK platform y build-tools
         run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
