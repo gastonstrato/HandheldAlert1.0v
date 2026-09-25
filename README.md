@@ -142,6 +142,19 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.4.0
+- El gatillo físico de escaneo cierra la ventana verde: queda cerrada
+  mientras se lee el código siguiente y se vuelve a abrir (con fade-in)
+  cuando aparece la nueva combinación. La tecla no se consume, el escaneo
+  funciona igual.
+- Nuevo botón "3. Configurar botón de escaneo": se toca y se aprieta el
+  gatillo una vez para registrar su código (varía según modelo y
+  configuración del equipo). Sin configurar, se prueban códigos comunes
+  (L1, R1, 10036).
+- Después de instalar esta versión hay que desactivar y volver a activar
+  el servicio de accesibilidad: se agregó el permiso para escuchar teclas
+  y Android no lo aplica hasta reiniciar el servicio.
+
 ## v1.3.0
 - Se suma soporte para la pantalla "Lectura Ruteador" (transacción
   distinta a Apertura de HU, sin bloque Total/Leído/Faltan): la firma de

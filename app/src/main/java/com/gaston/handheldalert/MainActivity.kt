@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnOverlayPermission.setOnClickListener { requestOverlayPermission() }
         binding.btnAccessibilityPermission.setOnClickListener { openAccessibilitySettings() }
+        binding.btnLearnScanKey.setOnClickListener { startLearningScanKey() }
         binding.btnTestOverlay.setOnClickListener {
             OverlayAlertManager(this).show(
                 AlertState.SUCCESS,
@@ -35,6 +36,20 @@ class MainActivity : AppCompatActivity() {
             )
         }
         binding.btnDebugText.setOnClickListener { showLastReadText() }
+    }
+
+    /**
+     * El código de tecla del gatillo varía según el modelo y la
+     * configuración del equipo, así que se registra apretándolo: el
+     * servicio de accesibilidad guarda la próxima tecla que llegue.
+     */
+    private fun startLearningScanKey() {
+        if (!isAccessibilityServiceEnabled()) {
+            Toast.makeText(this, "Primero habilitá el servicio de accesibilidad", Toast.LENGTH_LONG).show()
+            return
+        }
+        DetectionConfig.learningScanKey = true
+        Toast.makeText(this, "Apretá ahora el botón de escaneo", Toast.LENGTH_LONG).show()
     }
 
     /**
@@ -90,9 +105,15 @@ class MainActivity : AppCompatActivity() {
         val overlayOk = Settings.canDrawOverlays(this)
         val accessibilityOk = isAccessibilityServiceEnabled()
 
+        val scanKey = DetectionConfig.learnedScanKeyCode(this)
         val status = buildString {
             append(if (overlayOk) "✔" else "✘").append(" Superposición\n")
-            append(if (accessibilityOk) "✔" else "✘").append(" Accesibilidad")
+            append(if (accessibilityOk) "✔" else "✘").append(" Accesibilidad\n")
+            if (scanKey != null) {
+                append("✔ Botón de escaneo (código $scanKey)")
+            } else {
+                append("– Botón de escaneo sin configurar (se prueban códigos comunes)")
+            }
         }
         findViewById<TextView>(R.id.statusText).text = status
     }

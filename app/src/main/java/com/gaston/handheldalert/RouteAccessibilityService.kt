@@ -3,8 +3,10 @@ package com.gaston.handheldalert
 import android.accessibilityservice.AccessibilityService
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 
 /**
  * Lee el árbol de accesibilidad de la ventana del navegador (Dolphin o Chrome)
@@ -26,6 +28,10 @@ import android.view.accessibility.AccessibilityNodeInfo
  *
  * Cualquier otra lectura (texto sin patrones, o exactamente el mismo
  * resultado de siempre) no toca el overlay para nada.
+ *
+ * Además, apretar el gatillo físico de escaneo cierra la ventana (ver
+ * [onKeyEvent]): mientras se lee el código siguiente queda cerrada, y se
+ * vuelve a abrir sola cuando aparece la nueva combinación.
  */
 class RouteAccessibilityService : AccessibilityService() {
 
@@ -37,6 +43,7 @@ class RouteAccessibilityService : AccessibilityService() {
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
     private val pollHandler = Handler(Looper.getMainLooper())
     private var lastShownSignature: String? = null
+    private var pendingShow: Runnable? = null
 
     private val pollLoop = object : Runnable {
         override fun run() {
@@ -54,6 +61,37 @@ class RouteAccessibilityService : AccessibilityService() {
         val pkg = event?.packageName?.toString() ?: return
         if (!isMonitoredPackage(pkg)) return
         readAndClassify()
+    }
+
+    /**
+     * Gatillo físico de escaneo: cierra la ventana verde. Devuelve siempre
+     * false para NO consumir la tecla — el escaneo tiene que seguir
+     * funcionando igual que sin la app.
+     */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return false
+
+        if (DetectionConfig.learningScanKey) {
+            DetectionConfig.learningScanKey = false
+            DetectionConfig.saveScanKeyCode(this, event.keyCode)
+            Toast.makeText(
+                applicationContext,
+                "Botón de escaneo guardado (código ${event.keyCode})",
+                Toast.LENGTH_LONG
+            ).show()
+            return false
+        }
+
+        if (DetectionConfig.isScanKey(this, event.keyCode)) {
+            cancelPendingShow()
+            overlayManager.hide()
+        }
+        return false
+    }
+
+    private fun cancelPendingShow() {
+        pendingShow?.let { pollHandler.removeCallbacks(it) }
+        pendingShow = null
     }
 
     private fun readAndClassify() {
@@ -80,35 +118,38 @@ class RouteAccessibilityService : AccessibilityService() {
             AlertState.ERROR, AlertState.WARNING -> {
                 // Por ahora: ante un error/aviso, cerrar y no mostrar nada.
                 lastShownSignature = null
+                cancelPendingShow()
                 overlayManager.hide()
             }
             AlertState.SUCCESS -> {
-                val signature = ScreenTextHolder.currentSignature()
-                if (signature == null) {
-                    // Matcheó por una palabra suelta (ej. "confirmado") sin
-                    // el bloque completo de datos: se muestra directo, sin
-                    // lógica de parpadeo por firma.
-                    overlayManager.show(AlertState.SUCCESS, ScreenTextHolder.successMessage())
-                } else if (signature != lastShownSignature) {
-                    // Ruta/orden/total/leído/faltan distintos a lo último
-                    // mostrado: es un código nuevo. Apagar, esperar un
-                    // toque, prender con el dato nuevo.
-                    //
-                    // Importante: el mensaje se arma ACÁ, no adentro del
-                    // postDelayed. ScreenTextHolder es un estado global
-                    // compartido que el sondeo puede volver a pisar en esos
-                    // 200ms (ej. si el WebView devuelve una lectura vieja o
-                    // parcial mientras tanto); si leyéramos successMessage()
-                    // recién al mostrar, podía terminar mostrando el dato de
-                    // OTRO escaneo distinto al que disparó el cambio.
+                // Sin bloque de datos (matcheó una palabra suelta como
+                // "confirmado"), la firma es el propio mensaje: así tampoco
+                // se reabre sola en cada lectura después de cerrarla con el
+                // gatillo.
+                val message = ScreenTextHolder.successMessage()
+                val signature = ScreenTextHolder.currentSignature() ?: "msg:$message"
+                if (signature != lastShownSignature) {
+                    // Combinación nueva = código nuevo. El mensaje se captura
+                    // ACÁ y no dentro del postDelayed: ScreenTextHolder es
+                    // estado global que el sondeo puede pisar en esos 200ms
+                    // con una lectura vieja o parcial del WebView.
                     lastShownSignature = signature
-                    val message = ScreenTextHolder.successMessage()
-                    overlayManager.hide()
-                    pollHandler.postDelayed({
+                    cancelPendingShow()
+                    if (overlayManager.currentState == AlertState.NONE) {
+                        // Ya estaba cerrada (ej. por el gatillo): abrir directo.
                         overlayManager.show(AlertState.SUCCESS, message)
-                    }, BLINK_DELAY_MS)
+                    } else {
+                        overlayManager.hide()
+                        val show = Runnable {
+                            pendingShow = null
+                            overlayManager.show(AlertState.SUCCESS, message)
+                        }
+                        pendingShow = show
+                        pollHandler.postDelayed(show, BLINK_DELAY_MS)
+                    }
                 }
-                // Si la firma es igual a la ya mostrada, no se toca nada.
+                // Misma firma que la ya mostrada: no se toca nada (si se
+                // cerró con el gatillo, queda cerrada hasta el próximo código).
             }
             AlertState.NONE -> {
                 // No hacemos nada: el overlay queda como esté hasta que

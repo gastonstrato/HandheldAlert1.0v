@@ -42,6 +42,13 @@
             android:text="2. Habilitar servicio de accesibilidad" />
 
         <Button
+            android:id="@+id/btnLearnScanKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="3. Configurar botón de escaneo" />
+
+        <Button
             android:id="@+id/btnTestOverlay"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
