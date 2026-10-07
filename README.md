@@ -54,9 +54,11 @@ y una cuenta de GitHub, nada que instalar en tu PC.
    - Hacé commit de todo a la rama `main`.
 4. **Se compila solo**: andá a la pestaña "Actions" del repo — el workflow
    "Build debug APK" arranca automáticamente. Tarda unos minutos.
-5. **Descargá el APK**: cuando el run termine (tilde verde), entrá a ese
-   run → abajo, en "Artifacts", descargá `handheld-alert-debug-apk` (es un
-   .zip que contiene el `app-debug.apk`).
+5. **Descargá el APK**: cada build publica una release con el archivo
+   `HandheldAlert.apk` (las releases no vencen; los "Artifacts" del run sí,
+   a los 90 días). La última versión siempre está en este link fijo:
+   `https://github.com/gastonstrato/HandheldAlert1.0v/releases/latest/download/HandheldAlert.apk`
+   Las versiones anteriores quedan en la pestaña "Releases" del repo.
 6. Si más adelante cambiás código, repetí el paso 3 (subir/editar archivos
    en GitHub) — cada commit dispara un build nuevo automáticamente.
 

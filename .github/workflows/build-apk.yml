@@ -11,6 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      # Para crear la release con el APK (paso "Publicar release").
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,3 +49,27 @@ jobs:
         with:
           name: handheld-alert-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Los artifacts de Actions vencen a los 90 días; las releases no. Cada
+      # build queda como release propia y el APK lleva siempre el mismo
+      # nombre, así el link .../releases/latest/download/HandheldAlert.apk
+      # baja siempre la última versión.
+      - name: Preparar APK para la release
+        id: apk
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          cp app/build/outputs/apk/debug/app-debug.apk HandheldAlert.apk
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.apk.outputs.version }}-build${{ github.run_number }}
+          name: Handheld Alert ${{ steps.apk.outputs.version }} (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: HandheldAlert.apk
+          fail_on_unmatched_files: true
+          body: |
+            APK de Handheld Alert ${{ steps.apk.outputs.version }}, compilado desde ${{ github.ref_name }} (${{ github.sha }}).
+            Al actualizar, desactivar y volver a activar el servicio de accesibilidad.
