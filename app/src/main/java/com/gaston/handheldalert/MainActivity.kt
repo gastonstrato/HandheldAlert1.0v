@@ -60,9 +60,17 @@ class MainActivity : AppCompatActivity() {
      */
     private fun showLastReadText() {
         val text = ScreenTextHolder.lastFullScreenText.ifBlank { "(todavía no se leyó nada)" }
+        val readMs = ReadStats.lastReadMs
+        val triggerMs = ReadStats.lastTriggerToShowMs
+        val timings = buildString {
+            append("Lectura de pantalla: ")
+            append(if (readMs >= 0) "$readMs ms (${ReadStats.lastNodeCount} elementos)" else "sin datos")
+            append("\nGatillo → ventana: ")
+            append(if (triggerMs >= 0) "$triggerMs ms (incluye la respuesta de SAP)" else "sin datos")
+        }
         AlertDialog.Builder(this)
             .setTitle("Último texto leído: ${ScreenTextHolder.classify()}")
-            .setMessage(text)
+            .setMessage("$timings\n\n$text")
             .setPositiveButton("Cerrar", null)
             .show()
     }

@@ -144,6 +144,19 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.4.1
+- La ventana abre más rápido. La lectura de pantalla pasa a un hilo
+  propio y nunca hay más de una encolada: antes cada evento de
+  accesibilidad disparaba una lectura completa en el hilo principal, y la
+  ráfaga de eventos que manda Dolphin al actualizar la página las apilaba,
+  demorando tanto la lectura con el dato nuevo como el dibujo de la
+  ventana.
+- Sondeo cada 100 ms (antes 200), pausa al reabrir 120 ms (antes 200) y
+  fade-in de 100 ms (antes 220). La vista de la ventana se arma una sola
+  vez y se reusa.
+- El botón de debug muestra cuánto tarda cada lectura de pantalla y el
+  tiempo desde el gatillo hasta que se abre la ventana.
+
 ## v1.4.0
 - El gatillo físico de escaneo cierra la ventana verde: queda cerrada
   mientras se lee el código siguiente y se vuelve a abrir (con fade-in)

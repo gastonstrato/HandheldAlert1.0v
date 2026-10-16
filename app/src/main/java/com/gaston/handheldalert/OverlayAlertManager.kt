@@ -37,7 +37,38 @@ class OverlayAlertManager(private val context: Context) {
     private val windowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-    private var overlayView: View? = null
+    // La vista y sus parámetros se arman una sola vez y se reusan: abrir la
+    // ventana es solo agregarla al WindowManager, sin reconstruir nada.
+    private val alertView: LinearLayout by lazy {
+        buildView().apply {
+            // Tocar la alerta la oculta manualmente.
+            setOnClickListener { hide() }
+        }
+    }
+    private val layoutParams: WindowManager.LayoutParams by lazy {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        val displayMetrics = context.resources.displayMetrics
+        val overlayHeight = (displayMetrics.heightPixels * OVERLAY_HEIGHT_FRACTION).toInt()
+        WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayHeight,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP
+            x = 0
+            y = 0
+        }
+    }
+    private var attached = false
+
     var currentState: AlertState = AlertState.NONE
         private set
     private var lastShownMessage: String? = null
@@ -54,39 +85,16 @@ class OverlayAlertManager(private val context: Context) {
             else -> ContextColor.GREEN
         }
 
-        val isNewOverlay = overlayView == null
+        val isNewOverlay = !attached
         if (isNewOverlay) {
-            overlayView = buildView()
-            overlayView?.alpha = 0f
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
-            val displayMetrics = context.resources.displayMetrics
-            val overlayHeight = (displayMetrics.heightPixels * OVERLAY_HEIGHT_FRACTION).toInt()
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                overlayHeight,
-                type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-            )
-            params.gravity = Gravity.TOP
-            params.x = 0
-            params.y = 0
-            windowManager.addView(overlayView, params)
+            alertView.alpha = 0f
+            windowManager.addView(alertView, layoutParams)
+            attached = true
         }
 
-        val root = overlayView as LinearLayout
-        root.setBackgroundColor(color)
-        val textView = root.getChildAt(0) as TextView
+        alertView.setBackgroundColor(color)
+        val textView = alertView.getChildAt(0) as TextView
         textView.text = buildDisplayText(message)
-
-        // Tocar la alerta la oculta manualmente (por si el estado tarda en limpiarse).
-        root.setOnClickListener { hide() }
 
         // Si es la misma alerta con el mismo contenido (evento de accesibilidad
         // repetido sin info nueva), no hace falta animar. Pero si cambió el
@@ -96,21 +104,22 @@ class OverlayAlertManager(private val context: Context) {
         val changed = isNewOverlay || state != currentState || message != lastShownMessage
         currentState = state
         lastShownMessage = message
-        if (changed) fadeIn(root)
+        if (changed) fadeIn(alertView)
     }
 
     /** Fade-in rápido para distinguir que se trata de un dato nuevo. */
     private fun fadeIn(view: View) {
         view.animate().cancel()
         view.alpha = 0f
-        view.animate().alpha(1f).setDuration(220).start()
+        view.animate().alpha(1f).setDuration(100).start()
     }
 
     fun hide() {
-        overlayView?.let {
-            windowManager.removeView(it)
+        if (attached) {
+            alertView.animate().cancel()
+            windowManager.removeView(alertView)
+            attached = false
         }
-        overlayView = null
         currentState = AlertState.NONE
         lastShownMessage = null
     }
@@ -136,7 +145,7 @@ class OverlayAlertManager(private val context: Context) {
         return spannable
     }
 
-    private fun buildView(): View {
+    private fun buildView(): LinearLayout {
         val text = TextView(context).apply {
             textSize = 64f
             setTextColor(Color.WHITE)
