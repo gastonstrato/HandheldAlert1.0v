@@ -144,6 +144,24 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.5.0
+- Firma fija: el APK se firma siempre con la misma clave, que vive en los
+  secretos de GitHub (`SIGNING_KEYSTORE_BASE64` y `SIGNING_PASSWORD`),
+  nunca en el repo; el build falla si faltan. Antes cada build salía
+  firmado con una clave distinta y para actualizar había que desinstalar,
+  perdiendo la accesibilidad y el botón de escaneo configurado. Desde esta
+  versión cada actualización se instala encima de la anterior.
+- Actualización desde la app: al abrirla, o con "Buscar actualización",
+  consulta la última release de GitHub y, si hay una nueva, la baja y abre
+  el instalador (un toque en "Instalar"; Android no permite que una app
+  común se actualice sin confirmación). El servicio de accesibilidad
+  además chequea cada 6 horas y deja una notificación si hay versión nueva.
+- El versionCode sale del número de build de GitHub, que siempre crece; el
+  tag de la release (`-buildN`) es el mismo número, y es lo que compara el
+  actualizador.
+- Pasar a esta versión requiere desinstalar la anterior por última vez
+  (cambia la firma).
+
 ## v1.4.1
 - La ventana abre más rápido. La lectura de pantalla pasa a un hilo
   propio y nunca hay más de una encolada: antes cada evento de

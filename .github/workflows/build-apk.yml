@@ -41,7 +41,24 @@ jobs:
         with:
           gradle-version: 8.7
 
+      # Sin la clave fija, el APK saldría firmado con una clave distinta y no
+      # se podría instalar encima de la versión anterior (ni actualizar desde
+      # la app). Mejor que el build falle a publicar algo así.
+      - name: Preparar clave de firma
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ] || [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Faltan los secretos SIGNING_KEYSTORE_BASE64 y/o SIGNING_PASSWORD (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/handheld-alert.p12"
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/handheld-alert.p12" >> "$GITHUB_ENV"
+
       - name: Build debug APK
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: gradle assembleDebug --no-daemon
 
       - name: Upload APK

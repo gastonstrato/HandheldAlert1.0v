@@ -49,6 +49,8 @@ class RouteAccessibilityService : AccessibilityService() {
     companion object {
         private const val POLL_INTERVAL_MS = 100L
         private const val BLINK_DELAY_MS = 120L
+        private const val FIRST_UPDATE_CHECK_MS = 60_000L
+        private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
     }
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
@@ -75,11 +77,21 @@ class RouteAccessibilityService : AccessibilityService() {
         }
     }
 
+    // Avisa con una notificación si hay versión nueva (ver AppUpdater). La red
+    // va en un hilo propio para no frenar ni el hilo principal ni el lector.
+    private val updateCheck = object : Runnable {
+        override fun run() {
+            Thread { AppUpdater.checkAndNotify(applicationContext) }.start()
+            mainHandler.postDelayed(this, UPDATE_CHECK_INTERVAL_MS)
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         readerThread = HandlerThread("HandheldAlertReader").apply { start() }
         readerHandler = Handler(readerThread.looper)
         readerHandler.post(pollLoop)
+        mainHandler.postDelayed(updateCheck, FIRST_UPDATE_CHECK_MS)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
