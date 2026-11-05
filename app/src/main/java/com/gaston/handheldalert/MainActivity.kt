@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.TextUtils
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +46,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         binding.btnDebugText.setOnClickListener { showLastReadText() }
+        binding.btnSendDebug.setOnClickListener { sendDebug() }
         binding.btnCheckUpdate.setOnClickListener { checkForUpdate(quietIfNone = false) }
 
         // Android 13+: sin este permiso no aparece el aviso de versión nueva.
@@ -158,24 +160,67 @@ class MainActivity : AppCompatActivity() {
      */
     private fun showLastReadText() {
         val text = ScreenTextHolder.lastFullScreenText.ifBlank { "(todavía no se leyó nada)" }
-        val readMs = ReadStats.lastReadMs
-        val triggerMs = ReadStats.lastTriggerToShowMs
-        val timings = buildString {
-            append("Lectura de pantalla: ")
-            append(if (readMs >= 0) "$readMs ms (${ReadStats.lastNodeCount} elementos)" else "sin datos")
-            append("\nEscaneo → ventana: ")
-            append(if (triggerMs >= 0) "$triggerMs ms (incluye la respuesta de SAP)" else "sin datos")
-            append("\nCampo con el cursor: ")
-            val field = ReadStats.focusedFieldText
-            append(if (field == null) "(no se detecta ninguno)" else "\"$field\"")
-            append("\nÚltimo código detectado: ")
-            append(ReadStats.lastScanInput ?: "(ninguno todavía)")
-        }
         AlertDialog.Builder(this)
             .setTitle("Último texto leído: ${ScreenTextHolder.classify()}")
-            .setMessage("$timings\n\n$text")
+            .setMessage("${DebugReport.timingsAndFields()}\n\n$text")
             .setPositiveButton("Cerrar", null)
             .show()
+    }
+
+    /** Manda el reporte de debug al Google Doc (a través de su Apps Script). */
+    private fun sendDebug() {
+        val url = DebugReport.savedUrl(this)
+        if (url == null) {
+            askDebugUrl()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Enviar debug a Google Docs")
+            .setMessage("Se agrega al documento de debug la información de la última lectura de pantalla.")
+            .setPositiveButton("Enviar") { _, _ -> doSendDebug(url) }
+            .setNeutralButton("Cambiar link") { _, _ -> askDebugUrl() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun askDebugUrl() {
+        val input = EditText(this).apply {
+            hint = "https://script.google.com/macros/s/…/exec"
+            setText(DebugReport.savedUrl(this@MainActivity).orEmpty())
+            setSingleLine()
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Link del script de debug")
+            .setMessage("Pegá o escaneá el link de la aplicación web del documento (termina en /exec).")
+            .setView(input)
+            .setPositiveButton("Guardar y enviar") { _, _ ->
+                val url = input.text.toString().trim()
+                if (DebugReport.isValidUrl(url)) {
+                    DebugReport.saveUrl(this, url)
+                    doSendDebug(url)
+                } else {
+                    Toast.makeText(this, "Ese link no es de un script de Google (/exec)", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun doSendDebug(url: String) {
+        val report = DebugReport.build(this, Settings.canDrawOverlays(this), isAccessibilityServiceEnabled())
+        Toast.makeText(this, "Enviando debug…", Toast.LENGTH_SHORT).show()
+        Thread {
+            val result = DebugReport.send(url, report)
+            runOnUiThread {
+                val msg = when (result) {
+                    DebugReport.SendResult.Ok -> "Debug enviado al documento ✔"
+                    DebugReport.SendResult.NotPublic ->
+                        "El script no está publicado para \"Cualquier usuario\""
+                    is DebugReport.SendResult.Failed -> "No se pudo enviar (${result.reason})"
+                }
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            }
+        }.start()
     }
 
     override fun onResume() {

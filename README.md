@@ -144,6 +144,14 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.5.2
+- Botón "Enviar debug a Google Docs": manda el reporte de debug (equipo,
+  versión, permisos, tiempos, campo con el cursor, último código, texto
+  leído) al documento "Handheld Alert - Debug". La app no escribe en el Doc
+  directo (eso requiere iniciar sesión en Google): lo manda por POST al
+  Apps Script del documento (`tools/debug-google-docs.gs`), publicado como
+  aplicación web. El link del script se carga una vez en la app.
+
 ## v1.5.1
 - La ventana se cierra sola al escanear un código nuevo, sin depender del
   botón de escaneo (en la Honeywell CK65 el lector se queda con la tecla

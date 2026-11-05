@@ -89,4 +89,4 @@ jobs:
           fail_on_unmatched_files: true
           body: |
             APK de Handheld Alert ${{ steps.apk.outputs.version }}, compilado desde ${{ github.ref_name }} (${{ github.sha }}).
-            Al actualizar, desactivar y volver a activar el servicio de accesibilidad.
+            Se instala encima de la versión anterior; desde la app: "Buscar actualización".

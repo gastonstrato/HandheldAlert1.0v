@@ -69,5 +69,12 @@
             android:layout_marginTop="12dp"
             android:text="Ver último texto leído (debug)" />
 
+        <Button
+            android:id="@+id/btnSendDebug"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Enviar debug a Google Docs" />
+
     </LinearLayout>
 </ScrollView>
