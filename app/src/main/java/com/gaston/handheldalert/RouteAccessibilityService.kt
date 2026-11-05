@@ -1,6 +1,7 @@
 package com.gaston.handheldalert
 
 import android.accessibilityservice.AccessibilityService
+import android.graphics.Rect
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -11,12 +12,22 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Tiempos de la última lectura, para el botón de debug de MainActivity. */
+/** Tiempos y estado de la última lectura, para el botón de debug de MainActivity. */
 object ReadStats {
     @Volatile var lastReadMs: Long = -1
     @Volatile var lastNodeCount: Int = 0
     @Volatile var lastTriggerToShowMs: Long = -1
+    @Volatile var focusedFieldText: String? = null
+    @Volatile var lastScanInput: String? = null
 }
+
+/** Resultado de una lectura de pantalla (se arma en el hilo lector). */
+private class ScreenRead(
+    val text: String,
+    // Campo editable con el cursor: donde el lector escribe el código.
+    val fieldKey: String?,
+    val fieldText: String?
+)
 
 /**
  * Lee el árbol de accesibilidad de la ventana del navegador (Dolphin o Chrome)
@@ -32,9 +43,13 @@ object ReadStats {
  *    la tabla en Lectura Ruteador) cambia respecto a la última mostrada ->
  *    se escaneó un código nuevo: se muestra con los datos nuevos (fade-in).
  *
- * Además, apretar el gatillo físico de escaneo cierra la ventana (ver
- * [onKeyEvent]): queda cerrada mientras se lee el código siguiente y se
- * vuelve a abrir sola cuando aparece la nueva combinación.
+ * Además la ventana se cierra sola al escanear un código nuevo, para que no
+ * quede mostrando el dato anterior mientras SAP responde, y se vuelve a
+ * abrir cuando aparece la nueva combinación. Se detecta de dos formas:
+ * - El código aparece en el campo con el cursor (el lector lo escribe ahí
+ *   como si fuera teclado): ver [checkScanInput]. No depende del equipo.
+ * - El gatillo físico de escaneo, si llega a Android como tecla (en la
+ *   Zebra sí; en Honeywell el lector se lo queda): ver [onKeyEvent].
  *
  * Hilos: recorrer el árbol es lo caro (en una TC25 puede llevar cientos de
  * ms), así que se hace en [readerThread] y nunca hay más de una lectura
@@ -63,11 +78,13 @@ class RouteAccessibilityService : AccessibilityService() {
     private var lastShownSignature: String? = null
     private var pendingShow: Runnable? = null
     private var lastTriggerAt = 0L
+    private var lastFieldKey: String? = null
+    private var lastFieldText: String? = null
 
     private val readRunnable = Runnable {
         readQueued.set(false)
-        val text = readScreenText() ?: return@Runnable
-        mainHandler.post { applyScreenText(text) }
+        val read = readScreenText() ?: return@Runnable
+        mainHandler.post { applyScreenRead(read) }
     }
 
     private val pollLoop = object : Runnable {
@@ -128,11 +145,16 @@ class RouteAccessibilityService : AccessibilityService() {
         }
 
         if (DetectionConfig.isScanKey(this, event.keyCode)) {
-            lastTriggerAt = SystemClock.uptimeMillis()
-            cancelPendingShow()
-            overlayManager.hide()
+            onNewScanStarted()
         }
         return false
+    }
+
+    /** Se está leyendo un código nuevo: cerrar hasta que llegue su combinación. */
+    private fun onNewScanStarted() {
+        lastTriggerAt = SystemClock.uptimeMillis()
+        cancelPendingShow()
+        overlayManager.hide()
     }
 
     private fun cancelPendingShow() {
@@ -140,8 +162,29 @@ class RouteAccessibilityService : AccessibilityService() {
         pendingShow = null
     }
 
-    /** Hilo lector. Devuelve el texto visible del navegador, o null. */
-    private fun readScreenText(): String? {
+    /**
+     * El lector escribe el código en el campo con el cursor, como un teclado.
+     * Si ese mismo campo pasa a tener un valor nuevo (no vacío), es un
+     * escaneo nuevo. Solo cuenta el campo con el cursor, y solo si es el
+     * mismo que en la lectura anterior: así no cierran la ventana campos que
+     * SAP actualiza solo (ej. "Cantidad Leída"), ni un campo con datos al que
+     * se le pasa el cursor. Que el campo se vacíe (página recargada) no cuenta.
+     */
+    private fun checkScanInput(read: ScreenRead) {
+        val value = read.fieldText?.trim().orEmpty()
+        ReadStats.focusedFieldText = read.fieldText
+        if (read.fieldKey != null && read.fieldKey == lastFieldKey &&
+            value.isNotEmpty() && value != lastFieldText
+        ) {
+            ReadStats.lastScanInput = value
+            onNewScanStarted()
+        }
+        lastFieldKey = read.fieldKey
+        lastFieldText = value
+    }
+
+    /** Hilo lector. Devuelve lo visible del navegador, o null. */
+    private fun readScreenText(): ScreenRead? {
         val start = SystemClock.uptimeMillis()
         val root = try {
             rootInActiveWindow
@@ -156,17 +199,20 @@ class RouteAccessibilityService : AccessibilityService() {
         }
 
         val builder = StringBuilder()
-        val nodes = collectText(root, builder)
+        val field = FocusedField()
+        val nodes = collectText(root, builder, field)
         root.recycle()
 
         ReadStats.lastReadMs = SystemClock.uptimeMillis() - start
         ReadStats.lastNodeCount = nodes
-        return if (builder.isEmpty()) null else builder.toString()
+        if (builder.isEmpty()) return null
+        return ScreenRead(builder.toString(), field.key, field.text)
     }
 
-    /** Hilo principal: clasifica el texto leído y decide qué hacer con la ventana. */
-    private fun applyScreenText(text: String) {
-        ScreenTextHolder.update(text)
+    /** Hilo principal: aplica una lectura y decide qué hacer con la ventana. */
+    private fun applyScreenRead(read: ScreenRead) {
+        checkScanInput(read)
+        ScreenTextHolder.update(read.text)
 
         when (ScreenTextHolder.classify()) {
             AlertState.ERROR, AlertState.WARNING -> {
@@ -226,8 +272,22 @@ class RouteAccessibilityService : AccessibilityService() {
         return DetectionConfig.DEFAULT_BROWSER_PACKAGES.contains(pkg)
     }
 
-    /** Junta el texto visible bajo [node]. Devuelve cuántos nodos recorrió. */
-    private fun collectText(node: AccessibilityNodeInfo, out: StringBuilder, depth: Int = 0): Int {
+    /** Campo editable con el cursor que encontró [collectText]. */
+    private class FocusedField {
+        var key: String? = null
+        var text: String? = null
+    }
+
+    /**
+     * Junta el texto visible bajo [node] y anota en [field] el campo editable
+     * con el cursor. Devuelve cuántos nodos recorrió.
+     */
+    private fun collectText(
+        node: AccessibilityNodeInfo,
+        out: StringBuilder,
+        field: FocusedField,
+        depth: Int = 0
+    ): Int {
         if (depth > 40) return 0
         // Ojo: no seguir con nodos no visibles (ej. opciones ocultas de un
         // <select> colapsado) — si no, su texto se suma igual aunque no
@@ -237,6 +297,12 @@ class RouteAccessibilityService : AccessibilityService() {
         if (!text.isNullOrBlank()) {
             out.append(text).append(' ')
         }
+        if (node.isEditable && node.isFocused && field.key == null) {
+            // Identidad del campo: id (si el WebView lo expone) + posición.
+            val bounds = Rect().also { node.getBoundsInScreen(it) }
+            field.key = "${node.viewIdResourceName}@${bounds.flattenToString()}"
+            field.text = text?.toString().orEmpty()
+        }
         val desc = node.contentDescription
         if (!desc.isNullOrBlank()) {
             out.append(desc).append(' ')
@@ -244,7 +310,7 @@ class RouteAccessibilityService : AccessibilityService() {
         var count = 1
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            count += collectText(child, out, depth + 1)
+            count += collectText(child, out, field, depth + 1)
             child.recycle()
         }
         return count

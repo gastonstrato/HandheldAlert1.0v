@@ -144,6 +144,18 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.5.1
+- La ventana se cierra sola al escanear un código nuevo, sin depender del
+  botón de escaneo (en la Honeywell CK65 el lector se queda con la tecla
+  y la app no la ve). El lector escribe el código en el campo con el
+  cursor; cuando ese mismo campo pasa a tener un valor nuevo, la ventana
+  se cierra y se vuelve a abrir cuando aparece la nueva combinación. Solo
+  cuenta el campo con el cursor, para que "Cantidad Leída" u otros campos
+  que SAP actualiza solos no la cierren. El botón de escaneo sigue
+  funcionando donde sí llega (Zebra).
+- El debug muestra qué ve la app en el campo con el cursor y el último
+  código que detectó.
+
 ## v1.5.0
 - Firma fija: el APK se firma siempre con la misma clave, que vive en los
   secretos de GitHub (`SIGNING_KEYSTORE_BASE64` y `SIGNING_PASSWORD`),

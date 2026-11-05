@@ -163,8 +163,13 @@ class MainActivity : AppCompatActivity() {
         val timings = buildString {
             append("Lectura de pantalla: ")
             append(if (readMs >= 0) "$readMs ms (${ReadStats.lastNodeCount} elementos)" else "sin datos")
-            append("\nGatillo → ventana: ")
+            append("\nEscaneo → ventana: ")
             append(if (triggerMs >= 0) "$triggerMs ms (incluye la respuesta de SAP)" else "sin datos")
+            append("\nCampo con el cursor: ")
+            val field = ReadStats.focusedFieldText
+            append(if (field == null) "(no se detecta ninguno)" else "\"$field\"")
+            append("\nÚltimo código detectado: ")
+            append(ReadStats.lastScanInput ?: "(ninguno todavía)")
         }
         AlertDialog.Builder(this)
             .setTitle("Último texto leído: ${ScreenTextHolder.classify()}")
