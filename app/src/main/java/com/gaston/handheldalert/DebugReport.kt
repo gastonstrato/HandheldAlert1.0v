@@ -34,6 +34,19 @@ object DebugReport {
         append(if (field == null) "(no se detecta ninguno)" else "\"$field\"")
         append("\nÚltimo código detectado: ")
         append(ReadStats.lastScanInput ?: "(ninguno todavía)")
+        append("\nAviso del lector (Data Intent): ")
+        append(scannerIntentSummary())
+        append("\nÚltimas teclas recibidas: ")
+        val keys = ReadStats.recentKeys
+        append(if (keys.isEmpty()) "(ninguna)" else keys.joinToString(", "))
+    }
+
+    fun scannerIntentSummary(): String {
+        val count = ReadStats.scannerIntentCount
+        if (count == 0) return "no llegó ninguno"
+        val secs = (System.currentTimeMillis() - ReadStats.lastScannerIntentAt) / 1000
+        val data = ReadStats.lastScannerData?.let { " — código \"$it\"" }.orEmpty()
+        return "$count recibidos, el último hace $secs s$data"
     }
 
     fun build(context: Context, overlayOk: Boolean, accessibilityOk: Boolean): String {

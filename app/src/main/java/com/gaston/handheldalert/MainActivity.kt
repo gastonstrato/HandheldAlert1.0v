@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnOverlayPermission.setOnClickListener { requestOverlayPermission() }
         binding.btnAccessibilityPermission.setOnClickListener { openAccessibilitySettings() }
         binding.btnLearnScanKey.setOnClickListener { startLearningScanKey() }
+        binding.btnHoneywellSetup.setOnClickListener { showHoneywellSetup() }
         binding.btnTestOverlay.setOnClickListener {
             OverlayAlertManager(this).show(
                 AlertState.SUCCESS,
@@ -150,6 +151,39 @@ class MainActivity : AppCompatActivity() {
         }
         DetectionConfig.learningScanKey = true
         Toast.makeText(this, "Apretá ahora el botón de escaneo", Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * En Honeywell el botón azul no llega como tecla, así que el modo
+     * aprender no lo ve. En su lugar se le pide al lector que avise cada
+     * lectura con un "Data Intent" (ver RouteAccessibilityService), sin
+     * apagar el Wedge para que el código se siga escribiendo en SAP.
+     */
+    private fun showHoneywellSetup() {
+        val action = DetectionConfig.SCAN_INTENT_ACTION
+        val message = """
+            Para que la ventana verde se cierre al apretar el botón azul y leer un código, el lector Honeywell tiene que avisarle a la app. Se configura una sola vez:
+
+            1. Ajustes de Android > Honeywell Settings > Scanning (Escaneo) > Internal Scanner > Default Profile.
+            2. Entrar en "Data Processing Settings".
+            3. Dejar "Wedge" ACTIVADO (si no, el código no se escribe en SAP).
+            4. Activar "Data Intent" y entrar a sus opciones:
+               • Action: $action
+               • Category, Package name y Class name: vacíos.
+            5. No activar "Scan to Intent".
+
+            Para probar: abrí SAP, escaneá un código y volvé a este botón.
+
+            Estado: ${DebugReport.scannerIntentSummary()}
+        """.trimIndent()
+        AlertDialog.Builder(this)
+            .setTitle("Honeywell: botón azul")
+            .setMessage(message)
+            .setPositiveButton("Abrir ajustes") { _, _ ->
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
     }
 
     /**
@@ -276,6 +310,9 @@ class MainActivity : AppCompatActivity() {
                 append("✔ Botón de escaneo (código $scanKey)")
             } else {
                 append("– Botón de escaneo sin configurar (se prueban códigos comunes)")
+            }
+            if (ReadStats.scannerIntentCount > 0) {
+                append("\n✔ Lector Honeywell avisando (${ReadStats.scannerIntentCount} lecturas)")
             }
         }
         findViewById<TextView>(R.id.statusText).text = status

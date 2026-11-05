@@ -49,6 +49,13 @@
             android:text="3. Configurar botón de escaneo" />
 
         <Button
+            android:id="@+id/btnHoneywellSetup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="4. Honeywell: cerrar con el botón azul" />
+
+        <Button
             android:id="@+id/btnCheckUpdate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

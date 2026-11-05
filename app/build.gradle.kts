@@ -24,7 +24,7 @@ android {
         // El actualizador compara este número con el "-buildN" de la última
         // release, que es el mismo número de build de GitHub.
         versionCode = ciBuildNumber ?: 1
-        versionName = "1.5.2"
+        versionName = "1.5.3"
     }
 
     signingConfigs {

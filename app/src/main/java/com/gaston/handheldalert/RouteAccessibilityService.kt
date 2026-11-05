@@ -1,6 +1,10 @@
 package com.gaston.handheldalert
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Rect
 import android.os.Handler
 import android.os.HandlerThread
@@ -10,6 +14,7 @@ import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Tiempos y estado de la última lectura, para el botón de debug de MainActivity. */
@@ -19,6 +24,12 @@ object ReadStats {
     @Volatile var lastTriggerToShowMs: Long = -1
     @Volatile var focusedFieldText: String? = null
     @Volatile var lastScanInput: String? = null
+    // Avisos del lector Honeywell (Data Intent): cuántos llegaron y cuándo.
+    @Volatile var scannerIntentCount: Int = 0
+    @Volatile var lastScannerIntentAt: Long = 0 // System.currentTimeMillis()
+    @Volatile var lastScannerData: String? = null
+    // Últimas teclas que llegaron al servicio (para ver qué manda cada equipo).
+    @Volatile var recentKeys: List<Int> = emptyList()
 }
 
 /** Resultado de una lectura de pantalla (se arma en el hilo lector). */
@@ -50,6 +61,9 @@ private class ScreenRead(
  *   como si fuera teclado): ver [checkScanInput]. No depende del equipo.
  * - El gatillo físico de escaneo, si llega a Android como tecla (en la
  *   Zebra sí; en Honeywell el lector se lo queda): ver [onKeyEvent].
+ * - El aviso que manda el lector Honeywell en cada lectura si se le activa
+ *   "Data Intent" (sin apagar el Wedge, así el código se sigue escribiendo
+ *   en SAP como siempre): ver [scannerReceiver].
  *
  * Hilos: recorrer el árbol es lo caro (en una TC25 puede llevar cientos de
  * ms), así que se hace en [readerThread] y nunca hay más de una lectura
@@ -103,12 +117,45 @@ class RouteAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Honeywell (CK65 y similares): el botón azul no llega a Android como
+     * tecla — el servicio del lector se lo queda. Pero si en los ajustes del
+     * lector se activa "Data Intent" con la acción
+     * [DetectionConfig.SCAN_INTENT_ACTION], el lector avisa con un broadcast
+     * cada vez que lee un código, además de escribirlo en SAP. Llega en el
+     * hilo principal, apenas se lee el código y antes de que SAP responda.
+     */
+    private val scannerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            ReadStats.scannerIntentCount++
+            ReadStats.lastScannerIntentAt = System.currentTimeMillis()
+            ReadStats.lastScannerData = intent.getStringExtra("data")
+            onNewScanStarted()
+        }
+    }
+    private var scannerReceiverRegistered = false
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         readerThread = HandlerThread("HandheldAlertReader").apply { start() }
         readerHandler = Handler(readerThread.looper)
         readerHandler.post(pollLoop)
         mainHandler.postDelayed(updateCheck, FIRST_UPDATE_CHECK_MS)
+        registerScannerReceiver()
+    }
+
+    private fun registerScannerReceiver() {
+        if (scannerReceiverRegistered) return
+        val filter = IntentFilter(DetectionConfig.SCAN_INTENT_ACTION).apply {
+            // Si en el equipo se completa "Category" con DEFAULT, el intent
+            // la trae, y un filtro sin esa categoría no lo recibiría.
+            addCategory(Intent.CATEGORY_DEFAULT)
+        }
+        // Exportado: el que lo manda es el servicio del lector (otra app).
+        ContextCompat.registerReceiver(
+            this, scannerReceiver, filter, ContextCompat.RECEIVER_EXPORTED
+        )
+        scannerReceiverRegistered = true
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -132,6 +179,7 @@ class RouteAccessibilityService : AccessibilityService() {
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) return false
+        ReadStats.recentKeys = (ReadStats.recentKeys + event.keyCode).takeLast(10)
 
         if (DetectionConfig.learningScanKey) {
             DetectionConfig.learningScanKey = false
@@ -318,6 +366,10 @@ class RouteAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (scannerReceiverRegistered) {
+            unregisterReceiver(scannerReceiver)
+            scannerReceiverRegistered = false
+        }
         mainHandler.removeCallbacksAndMessages(null)
         if (::readerThread.isInitialized) {
             readerHandler.removeCallbacksAndMessages(null)

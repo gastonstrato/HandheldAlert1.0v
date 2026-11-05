@@ -144,6 +144,17 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.5.3
+- Honeywell CK65: la ventana verde se cierra al apretar el botón azul y
+  leer un código. El lector de Honeywell no le pasa ese botón a Android,
+  pero puede avisar cada lectura con un "Data Intent" sin dejar de escribir
+  el código en SAP. Se configura una vez en el equipo (botón "4. Honeywell:
+  cerrar con el botón azul" de la app tiene los pasos): Honeywell Settings >
+  Scanning > Internal Scanner > Default Profile > Data Processing Settings,
+  Wedge activado, Data Intent activado con Action `handheld.scan`.
+- El debug muestra cuántos avisos del lector llegaron y las últimas teclas
+  recibidas.
+
 ## v1.5.2
 - Botón "Enviar debug a Google Docs": manda el reporte de debug (equipo,
   versión, permisos, tiempos, campo con el cursor, último código, texto

@@ -12,6 +12,12 @@ object DetectionConfig {
     private const val PREFS = "handheld_alert_prefs"
     private const val KEY_SCAN_KEYCODE = "scan_keycode"
 
+    // Acción del "Data Intent" que hay que cargar en el lector Honeywell
+    // (Ajustes > Escaneo > Escáner interno > Perfil predeterminado > Ajustes
+    // de procesamiento de datos > Data Intent). Corta a propósito: se tipea
+    // en el teclado de la handheld.
+    const val SCAN_INTENT_ACTION = "handheld.scan"
+
     // Códigos que suelen mandar los gatillos de escaneo si no se configuró
     // uno a mano. Varía según modelo y según cómo esté configurado el
     // equipo (Key Programmer / DataWedge), por eso existe el modo aprender.
