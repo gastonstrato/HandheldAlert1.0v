@@ -164,7 +164,7 @@ class MainActivity : AppCompatActivity() {
         val message = """
             Para que la ventana verde se cierre al apretar el botón azul y leer un código, el lector Honeywell tiene que avisarle a la app. Se configura una sola vez:
 
-            1. Ajustes de Android > Honeywell Settings > Scanning (Escaneo) > Internal Scanner > Default Profile.
+            1. Ajustes de Android > Honeywell Settings > Scanning (Escaneo) > Internal Scanner > Default Profile. Si en esa lista hay un perfil propio del navegador (Dolphin/Chrome/Enterprise Browser), hacerlo en ESE perfil: el Default no se usa en esa app.
             2. Entrar en "Data Processing Settings".
             3. Dejar "Wedge" ACTIVADO (si no, el código no se escribe en SAP).
             4. Activar "Data Intent" y entrar a sus opciones:
@@ -175,6 +175,8 @@ class MainActivity : AppCompatActivity() {
             Para probar: abrí SAP, escaneá un código y volvé a este botón.
 
             Estado: ${DebugReport.scannerIntentSummary()}
+            Teclas recibidas: ${ReadStats.recentKeys.joinToString(", ").ifEmpty { "ninguna" }}
+            Sonidos detectados: ${ReadStats.soundCount}
         """.trimIndent()
         AlertDialog.Builder(this)
             .setTitle("Honeywell: botón azul")

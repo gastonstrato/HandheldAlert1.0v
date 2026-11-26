@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Rect
+import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -30,6 +32,10 @@ object ReadStats {
     @Volatile var lastScannerData: String? = null
     // Últimas teclas que llegaron al servicio (para ver qué manda cada equipo).
     @Volatile var recentKeys: List<Int> = emptyList()
+    // Sonidos que empezaron a sonar en el equipo (ej. el pitido del lector).
+    @Volatile var soundCount: Int = 0
+    @Volatile var lastSoundAt: Long = 0 // System.currentTimeMillis()
+    @Volatile var lastSoundUsage: Int = -1
 }
 
 /** Resultado de una lectura de pantalla (se arma en el hilo lector). */
@@ -64,6 +70,8 @@ private class ScreenRead(
  * - El aviso que manda el lector Honeywell en cada lectura si se le activa
  *   "Data Intent" (sin apagar el Wedge, así el código se sigue escribiendo
  *   en SAP como siempre): ver [scannerReceiver].
+ * - El Enter/Tab que el lector manda al final del código: ver [onKeyEvent].
+ * - El pitido del lector al leer: ver [playbackCallback].
  *
  * Hilos: recorrer el árbol es lo caro (en una TC25 puede llevar cientos de
  * ms), así que se hace en [readerThread] y nunca hay más de una lectura
@@ -80,6 +88,17 @@ class RouteAccessibilityService : AccessibilityService() {
         private const val BLINK_DELAY_MS = 120L
         private const val FIRST_UPDATE_CHECK_MS = 60_000L
         private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+        // Un sonido recién abierta la ventana es de SAP respondiendo, no del
+        // lector: el pitido de lectura suena antes de que llegue el dato.
+        private const val SOUND_IGNORE_AFTER_SHOW_MS = 1500L
+
+        // Teclas que manda el lector al final del código (sufijo Enter/Tab):
+        // en Honeywell van como tecla aunque el código vaya como texto.
+        private val SUBMIT_KEYS = setOf(
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_TAB
+        )
     }
 
     private val overlayManager by lazy { OverlayAlertManager(applicationContext) }
@@ -94,6 +113,7 @@ class RouteAccessibilityService : AccessibilityService() {
     private var lastTriggerAt = 0L
     private var lastFieldKey: String? = null
     private var lastFieldText: String? = null
+    private var lastShownAt = 0L
 
     private val readRunnable = Runnable {
         readQueued.set(false)
@@ -135,6 +155,32 @@ class RouteAccessibilityService : AccessibilityService() {
     }
     private var scannerReceiverRegistered = false
 
+    /**
+     * Pitido del lector: cuando lee un código, el lector hace sonar un
+     * pitido. Android avisa a cualquier app cuando empieza a sonar algo
+     * (sin decir qué app es). Sirve en cualquier equipo sin configurar nada,
+     * siempre que el lector tenga el sonido activado.
+     */
+    private val audioManager by lazy { getSystemService(AudioManager::class.java) }
+    private var activePlayers: Set<AudioPlaybackConfiguration> = emptySet()
+    private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
+        override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
+            val now = configs.toSet()
+            val started = now - activePlayers
+            activePlayers = now
+            if (started.isEmpty()) return
+            ReadStats.soundCount++
+            ReadStats.lastSoundAt = System.currentTimeMillis()
+            ReadStats.lastSoundUsage = started.first().audioAttributes.usage
+            if (overlayManager.currentState != AlertState.NONE &&
+                SystemClock.uptimeMillis() - lastShownAt > SOUND_IGNORE_AFTER_SHOW_MS
+            ) {
+                onNewScanStarted()
+            }
+        }
+    }
+    private var playbackCallbackRegistered = false
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         readerThread = HandlerThread("HandheldAlertReader").apply { start() }
@@ -142,6 +188,18 @@ class RouteAccessibilityService : AccessibilityService() {
         readerHandler.post(pollLoop)
         mainHandler.postDelayed(updateCheck, FIRST_UPDATE_CHECK_MS)
         registerScannerReceiver()
+        registerPlaybackCallback()
+    }
+
+    private fun registerPlaybackCallback() {
+        if (playbackCallbackRegistered) return
+        try {
+            activePlayers = audioManager.activePlaybackConfigurations.toSet()
+            audioManager.registerAudioPlaybackCallback(playbackCallback, mainHandler)
+            playbackCallbackRegistered = true
+        } catch (_: Exception) {
+            // Sin esto queda el resto de las formas de detectar el escaneo.
+        }
     }
 
     private fun registerScannerReceiver() {
@@ -192,7 +250,7 @@ class RouteAccessibilityService : AccessibilityService() {
             return false
         }
 
-        if (DetectionConfig.isScanKey(this, event.keyCode)) {
+        if (DetectionConfig.isScanKey(this, event.keyCode) || event.keyCode in SUBMIT_KEYS) {
             onNewScanStarted()
         }
         return false
@@ -308,6 +366,7 @@ class RouteAccessibilityService : AccessibilityService() {
 
     private fun showSuccess(message: String) {
         overlayManager.show(AlertState.SUCCESS, message)
+        lastShownAt = SystemClock.uptimeMillis()
         if (lastTriggerAt > 0) {
             ReadStats.lastTriggerToShowMs = SystemClock.uptimeMillis() - lastTriggerAt
             lastTriggerAt = 0
@@ -369,6 +428,10 @@ class RouteAccessibilityService : AccessibilityService() {
         if (scannerReceiverRegistered) {
             unregisterReceiver(scannerReceiver)
             scannerReceiverRegistered = false
+        }
+        if (playbackCallbackRegistered) {
+            audioManager.unregisterAudioPlaybackCallback(playbackCallback)
+            playbackCallbackRegistered = false
         }
         mainHandler.removeCallbacksAndMessages(null)
         if (::readerThread.isInitialized) {

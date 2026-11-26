@@ -144,6 +144,17 @@ dispare rojo de más.
   monitoreados.
 
 
+## v1.5.4
+- Más formas de cerrar la ventana al escanear, para equipos donde el
+  Data Intent no llega: el Enter/Tab que el lector manda al final del
+  código, y el pitido del lector al leer (Android avisa cuando empieza a
+  sonar algo; se ignoran los sonidos de los primeros 1,5 s con la ventana
+  abierta, que son de SAP). Permiso `com.honeywell.decode.permission.DECODE`
+  por si el lector manda el Data Intent solo a apps que lo tienen.
+- El botón "4. Honeywell" avisa que si el navegador tiene un perfil propio
+  en el lector, el Data Intent se configura en ese perfil y no en el Default.
+- El debug muestra los sonidos detectados.
+
 ## v1.5.3
 - Honeywell CK65: la ventana verde se cierra al apretar el botón azul y
   leer un código. El lector de Honeywell no le pasa ese botón a Android,

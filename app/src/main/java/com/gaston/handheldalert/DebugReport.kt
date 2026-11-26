@@ -39,6 +39,14 @@ object DebugReport {
         append("\nÚltimas teclas recibidas: ")
         val keys = ReadStats.recentKeys
         append(if (keys.isEmpty()) "(ninguna)" else keys.joinToString(", "))
+        append("\nSonidos detectados: ")
+        val sounds = ReadStats.soundCount
+        if (sounds == 0) {
+            append("ninguno")
+        } else {
+            val secs = (System.currentTimeMillis() - ReadStats.lastSoundAt) / 1000
+            append("$sounds, el último hace $secs s (tipo ${ReadStats.lastSoundUsage})")
+        }
     }
 
     fun scannerIntentSummary(): String {
